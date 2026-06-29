@@ -1,3 +1,6 @@
+import { GameConfig } from "../config/GameConfig.js";
+import { TouchControls } from "./TouchControls.js";
+
 export class Input {
   constructor(canvas) {
     this.canvas = canvas;
@@ -5,6 +8,7 @@ export class Input {
     this.justPressedKeys = new Set();
     this.mousePosition = { x: 0, y: 0 };
     this.mouseClicked = false;
+    this.touch = new TouchControls(GameConfig.resolution.width, GameConfig.resolution.height);
 
     window.addEventListener("keydown", (event) => {
       if (isGameKey(event.code)) {
@@ -35,14 +39,103 @@ export class Input {
       this.mouseClicked = true;
     });
 
+    canvas.addEventListener(
+      "touchstart",
+      (event) => {
+        this.handleTouchEvent(event);
+        this.touch.handleTouchStart(event, (touch) => this.getCanvasPoint(touch));
+        this.syncPointerFromTouch(event);
+      },
+      { passive: false },
+    );
+
+    canvas.addEventListener(
+      "touchmove",
+      (event) => {
+        this.handleTouchEvent(event);
+        this.touch.handleTouchMove(event, (touch) => this.getCanvasPoint(touch));
+        this.syncPointerFromTouch(event);
+      },
+      { passive: false },
+    );
+
+    canvas.addEventListener("touchend", (event) => {
+      this.touch.handleTouchEnd(event, (touch) => this.getCanvasPoint(touch));
+      this.applyTouchTap();
+      this.syncPointerFromTouch(event);
+    });
+
+    canvas.addEventListener("touchcancel", (event) => {
+      this.touch.handleTouchCancel(event);
+      this.syncPointerFromTouch(event);
+    });
+
     window.addEventListener("blur", () => {
       this.keys.clear();
       this.justPressedKeys.clear();
       this.mouseClicked = false;
+      this.touch.resetJoystick();
+      this.touch.actionHeld = false;
     });
   }
 
+  handleTouchEvent(event) {
+    if (this.touch.enabled) {
+      event.preventDefault();
+    }
+  }
+
+  syncPointerFromTouch(event) {
+    const touch = event.touches[0] ?? event.changedTouches[0];
+
+    if (touch) {
+      this.mousePosition = this.getCanvasPoint(touch);
+    }
+  }
+
+  applyTouchTap() {
+    const tap = this.touch.consumePendingTap();
+
+    if (!tap) {
+      return;
+    }
+
+    this.mousePosition = { x: tap.x, y: tap.y };
+    this.mouseClicked = true;
+  }
+
+  isTouchEnabled() {
+    return this.touch.enabled;
+  }
+
+  drawTouchControls(context, state) {
+    this.touch.draw(context, {
+      state,
+      showGameplayControls: this.touch.shouldShowGameplayControls(state),
+      showActionButton: this.touch.shouldShowActionButton(state),
+    });
+  }
+
+  shouldBlockTapAt(point) {
+    return (
+      this.touch.isPointOnActionButton(point) ||
+      this.touch.isPointOnJoystick(point) ||
+      (this.touch.shouldShowGameplayControls("playing") && this.touch.isJoystickZone(point))
+    );
+  }
+
   getMovementVector() {
+    const keyboard = this.getKeyboardMovementVector();
+    const touch = this.touch.getMovementVector();
+
+    if (keyboard.x !== 0 || keyboard.y !== 0) {
+      return keyboard;
+    }
+
+    return touch;
+  }
+
+  getKeyboardMovementVector() {
     let x = 0;
     let y = 0;
 
@@ -66,11 +159,19 @@ export class Input {
   }
 
   isActionPressed() {
-    return this.keys.has("Enter") || this.keys.has("Space");
+    return this.keys.has("Enter") || this.keys.has("Space") || this.touch.isActionHeld();
   }
 
   wasActionJustPressed() {
-    return this.justPressedKeys.has("Enter") || this.justPressedKeys.has("Space");
+    return (
+      this.justPressedKeys.has("Enter") ||
+      this.justPressedKeys.has("Space") ||
+      this.touch.wasActionJustPressed()
+    );
+  }
+
+  consumeTouchAttackPress() {
+    return this.touch.wasActionJustPressed();
   }
 
   isRestartPressed() {
@@ -108,6 +209,12 @@ export class Input {
 
   consumeClick() {
     const wasClicked = this.mouseClicked;
+
+    if (wasClicked && this.shouldBlockTapAt(this.mousePosition)) {
+      this.mouseClicked = false;
+      return false;
+    }
+
     this.mouseClicked = false;
     return wasClicked;
   }
@@ -117,12 +224,14 @@ export class Input {
     this.justPressedKeys.clear();
   }
 
-  getCanvasPoint(event) {
+  getCanvasPoint(source) {
     const bounds = this.canvas.getBoundingClientRect();
+    const clientX = source.clientX ?? 0;
+    const clientY = source.clientY ?? 0;
 
     return {
-      x: ((event.clientX - bounds.left) / bounds.width) * this.canvas.width,
-      y: ((event.clientY - bounds.top) / bounds.height) * this.canvas.height,
+      x: ((clientX - bounds.left) / bounds.width) * this.canvas.width,
+      y: ((clientY - bounds.top) / bounds.height) * this.canvas.height,
     };
   }
 }

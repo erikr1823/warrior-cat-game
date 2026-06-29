@@ -52,10 +52,10 @@ export class CharacterSelectSystem {
   }
 
   buildCharacterButtons() {
-    const cardWidth = 500;
+    const cardWidth = 540;
     const cardHeight = 132;
-    const gap = 28;
-    const totalWidth = cardWidth * 3 + gap * 2;
+    const gap = 36;
+    const totalWidth = cardWidth * 2 + gap;
     const startX = (this.width - totalWidth) / 2;
     const y = 252;
 

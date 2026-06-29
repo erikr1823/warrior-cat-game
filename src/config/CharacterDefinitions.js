@@ -21,16 +21,6 @@ export const PLAYABLE_CHARACTERS = [
       damageMultiplier: 1.08,
     },
   },
-  {
-    id: "pupse",
-    name: "Pupse",
-    title: "Sunplate Knight",
-    description: "Armored ginger guardian. Built to endure.",
-    accent: "#ffd27e",
-    bonuses: {
-      maxHealthBonus: 12,
-    },
-  },
 ];
 
 export function getCharacterDefinition(id) {

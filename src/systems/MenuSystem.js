@@ -1,5 +1,9 @@
 import { GameConfig } from "../config/GameConfig.js";
 
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
 export class MenuSystem {
   constructor(context, width, height) {
     this.context = context;
@@ -7,13 +11,9 @@ export class MenuSystem {
     this.height = height;
     this.background = new Image();
     this.background.src = GameConfig.menu.fallbackImage;
-    this.backgroundVideo = document.createElement("video");
-    this.backgroundVideo.src = GameConfig.menu.video;
-    this.backgroundVideo.loop = true;
-    this.backgroundVideo.muted = true;
-    this.backgroundVideo.playsInline = true;
-    this.backgroundVideo.preload = "auto";
-    this.backgroundVideo.play().catch(() => {});
+    this.backgroundVideos = [this.createBackgroundVideo(), this.createBackgroundVideo()];
+    this.activeVideoIndex = 0;
+    this.loopCrossfadeActive = false;
     this.startButton = {
       x: width / 2 - 210,
       y: 768,
@@ -41,6 +41,65 @@ export class MenuSystem {
       bruce: this.loadCreditPhoto("./src/assets/credits/bruce-odin-minnie.png"),
       bailey: this.loadCreditPhoto("./src/assets/credits/bailey.png"),
     };
+  }
+
+  createBackgroundVideo() {
+    const video = document.createElement("video");
+    video.src = GameConfig.menu.video;
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.play().catch(() => {});
+    return video;
+  }
+
+  getActiveBackgroundVideo() {
+    return this.backgroundVideos[this.activeVideoIndex];
+  }
+
+  getInactiveBackgroundVideo() {
+    return this.backgroundVideos[1 - this.activeVideoIndex];
+  }
+
+  updateBackgroundVideoLoop() {
+    const crossfadeDuration = GameConfig.menu.loopCrossfade ?? 0;
+    if (crossfadeDuration <= 0) {
+      return 1;
+    }
+
+    const active = this.getActiveBackgroundVideo();
+    const inactive = this.getInactiveBackgroundVideo();
+    const duration = active.duration;
+
+    if (!Number.isFinite(duration) || duration <= 0) {
+      return 1;
+    }
+
+    const timeRemaining = duration - active.currentTime;
+
+    if (timeRemaining <= crossfadeDuration && !this.loopCrossfadeActive) {
+      this.loopCrossfadeActive = true;
+      inactive.currentTime = 0;
+      inactive.play().catch(() => {});
+    }
+
+    if (this.loopCrossfadeActive) {
+      const blend = clamp01(1 - timeRemaining / crossfadeDuration);
+
+      if (blend >= 0.999 || active.ended) {
+        inactive.play().catch(() => {});
+        active.pause();
+        active.currentTime = 0;
+        this.activeVideoIndex = 1 - this.activeVideoIndex;
+        this.loopCrossfadeActive = false;
+        return 1;
+      }
+
+      return 1 - blend;
+    }
+
+    return 1;
   }
 
   loadCreditPhoto(src) {
@@ -178,6 +237,10 @@ export class MenuSystem {
     ctx.fillStyle = "#9eb0aa";
     ctx.fillText("Thank you for playing.", centerX, panel.y + 392);
 
+    ctx.font = "600 18px 'Courier New', monospace";
+    ctx.fillStyle = "#7a8a86";
+    ctx.fillText("Music: King's Feast by RandomMind (CC0)", centerX, panel.y + 430);
+
     this.backButton.y = panel.y + 468;
     this.drawSecondaryButton(this.backButton, backHovered);
 
@@ -234,13 +297,27 @@ export class MenuSystem {
 
   drawMenuBackground() {
     const ctx = this.context;
+    const activeVideo = this.getActiveBackgroundVideo();
 
-    if (this.backgroundVideo.readyState >= 2) {
-      if (this.backgroundVideo.paused) {
-        this.backgroundVideo.play().catch(() => {});
+    if (activeVideo.readyState >= 2) {
+      if (activeVideo.paused) {
+        activeVideo.play().catch(() => {});
       }
 
-      this.drawMediaFill(ctx, this.backgroundVideo);
+      const activeOpacity = this.updateBackgroundVideoLoop();
+      const crossfadeDuration = GameConfig.menu.loopCrossfade ?? 0;
+
+      if (crossfadeDuration > 0 && activeOpacity < 1) {
+        const inactiveVideo = this.getInactiveBackgroundVideo();
+        ctx.globalAlpha = activeOpacity;
+        this.drawMediaFill(ctx, activeVideo);
+        ctx.globalAlpha = 1 - activeOpacity;
+        this.drawMediaFill(ctx, inactiveVideo);
+        ctx.globalAlpha = 1;
+        return;
+      }
+
+      this.drawMediaFill(ctx, activeVideo);
       return;
     }
 

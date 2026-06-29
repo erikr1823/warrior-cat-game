@@ -1,12 +1,20 @@
+import { GameConfig } from "../config/GameConfig.js";
+
 export class AudioSystem {
   constructor() {
     this.context = null;
     this.muted = false;
     this.shootCooldown = 0;
+    this.music = new Audio(GameConfig.audio.music.menu);
+    this.music.loop = true;
+    this.music.preload = "auto";
+    this.musicStarted = false;
+    this.musicState = "menu";
   }
 
   setMuted(muted) {
     this.muted = muted;
+    this.applyMusicVolume();
   }
 
   isMuted() {
@@ -21,6 +29,45 @@ export class AudioSystem {
     if (this.context.state === "suspended") {
       this.context.resume();
     }
+  }
+
+  ensureMusic() {
+    if (this.muted || this.musicStarted) {
+      return;
+    }
+
+    this.musicStarted = true;
+    this.applyMusicVolume();
+    this.music.play().catch(() => {
+      this.musicStarted = false;
+    });
+  }
+
+  syncMusicState(state) {
+    const isMenuMusic =
+      state === "menu" ||
+      state === "shop";
+
+    const nextState = isMenuMusic ? "menu" : "gameplay";
+    if (this.musicState === nextState) {
+      this.applyMusicVolume();
+      return;
+    }
+
+    this.musicState = nextState;
+    this.applyMusicVolume();
+  }
+
+  applyMusicVolume() {
+    const config = GameConfig.audio.music;
+
+    if (this.muted) {
+      this.music.volume = 0;
+      return;
+    }
+
+    this.music.volume =
+      this.musicState === "menu" ? config.volume : config.gameplayVolume;
   }
 
   update(deltaTime) {

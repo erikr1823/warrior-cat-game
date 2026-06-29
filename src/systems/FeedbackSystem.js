@@ -42,7 +42,12 @@ export class FeedbackSystem {
   ensureAudio() {
     if (!this.audio.isMuted()) {
       this.audio.ensureContext();
+      this.audio.ensureMusic();
     }
+  }
+
+  syncMusic(state) {
+    this.audio.syncMusicState(state);
   }
 
   update(deltaTime) {

@@ -33,6 +33,12 @@ export class WeaponSystem {
     }
   }
 
+  triggerManualBurst() {
+    for (const weapon of this.weapons.values()) {
+      weapon.timer = 0;
+    }
+  }
+
   addWeapon(id) {
     if (this.weapons.has(id)) {
       return this.weapons.get(id);

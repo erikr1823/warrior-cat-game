@@ -1,0 +1,12 @@
+Menu theme (CC0)
+
+Primary track:
+- King's Feast by RandomMind
+- https://opengameart.org/content/medieval-kings-feast
+- License: CC0 1.0 Universal (public domain)
+
+Optional itch.io alternatives (same pack, CC0):
+- Awakening.mp3 by kmontesdev
+- https://kmontesdev.itch.io/7-fantasy-music-tracks
+
+Run `npm run setup:music` to reinstall from Downloads or OpenGameArt.

@@ -19,6 +19,7 @@ This opens your browser to http://localhost:8765 automatically. If the page look
 |---------|---------|
 | `npm run setup:enemies` | Import enemy art from itch.io packs in Downloads |
 | `npm run setup:characters` | Re-slice character sprite sheets from `assets/character-sources/` |
+| `npm run setup:music` | Install upbeat medieval CC0 menu music (King's Feast) |
 
 ## Project layout
 

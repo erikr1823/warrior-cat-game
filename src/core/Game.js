@@ -95,6 +95,7 @@ export class Game {
       }
 
       this.render();
+      this.feedback.syncMusic(this.state);
     } catch (error) {
       console.error(error);
       this.running = false;
@@ -107,6 +108,12 @@ export class Game {
   }
 
   updateMenu() {
+    this.feedback.ensureAudio();
+
+    if (this.ui.consumeMuteClick(this.input)) {
+      this.feedback.toggleMute();
+    }
+
     if (this.menu.update(this.input)) {
       this.feedback.ensureAudio();
       this.state = "shop";
@@ -114,6 +121,8 @@ export class Game {
   }
 
   updateShop() {
+    this.feedback.ensureAudio();
+
     if (this.ui.consumeMuteClick(this.input)) {
       this.feedback.toggleMute();
     }
@@ -259,6 +268,10 @@ export class Game {
     this.feedback.update(deltaTime);
     this.player.update(deltaTime, this.input);
 
+    if (this.input.consumeTouchAttackPress()) {
+      this.weaponSystem.triggerManualBurst();
+    }
+
     if (this.ui.consumeMuteClick(this.input)) {
       this.feedback.toggleMute();
     }
@@ -305,12 +318,15 @@ export class Game {
 
     if (this.state === "menu") {
       this.menu.draw(this.input);
+      this.ui.drawMuteButton(this.feedback.isMuted());
+      this.input.drawTouchControls(this.context, this.state);
       return;
     }
 
     if (this.state === "shop") {
       this.shop.draw(this.input, this.saveData, this.metaUpgradeSystem);
       this.ui.drawMuteButton(this.feedback.isMuted());
+      this.input.drawTouchControls(this.context, this.state);
       return;
     }
 
@@ -388,6 +404,7 @@ export class Game {
       this.player.maxHealth,
       this.feedback.getLowHealthPulse(),
     );
+    this.input.drawTouchControls(this.context, this.state);
   }
 
   removeDeadEntities() {

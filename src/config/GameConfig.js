@@ -55,20 +55,6 @@ export const GameConfig = {
           up: 3,
         },
       },
-      pupse: {
-        name: "Pupse",
-        sheet: "./src/assets/sprites/player/pupse/sheet.png",
-        preview: "./src/assets/sprites/player/pupse/down.png",
-        frameWidth: 48,
-        frameHeight: 54,
-        framesPerDirection: 3,
-        directionRows: {
-          down: 0,
-          left: 1,
-          right: 2,
-          up: 3,
-        },
-      },
     },
     speed: 360,
     maxHealth: 100,
@@ -415,9 +401,17 @@ export const GameConfig = {
     maxParticles: 180,
     lowHealthThreshold: 0.25,
   },
+  audio: {
+    music: {
+      menu: "./src/assets/audio/menu-theme.mp3?v=20260629b",
+      volume: 0.38,
+      gameplayVolume: 0.28,
+    },
+  },
   menu: {
     fallbackImage: "./src/assets/menu/warrior-cat-menu.png",
-    video: "./src/assets/menu/warrior-cat-menu-loop.mp4?v=20260629",
+    video: "./src/assets/menu/warrior-cat-menu-loop.mp4?v=20260630",
+    loopCrossfade: 0,
     backgroundCrop: {
       right: 420,
       bottom: 72,

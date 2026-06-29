@@ -8,13 +8,12 @@ $sourceRoot = Join-Path $root "assets\character-sources"
 $characters = @{
   puzas = Join-Path $sourceRoot "puzas.png"
   kiki  = Join-Path $sourceRoot "kiki.png"
-  pupse = Join-Path $sourceRoot "pupse.png"
 }
 
 if (-not (Test-Path $sourceRoot)) {
   New-Item -ItemType Directory -Force -Path $sourceRoot | Out-Null
   Write-Host "Place source sprite sheets in: $sourceRoot"
-  Write-Host "  puzas.png, kiki.png, pupse.png"
+  Write-Host "  puzas.png, kiki.png"
   Write-Host ""
   Write-Host "Character frames already in src/assets/sprites/player/ can be used without re-running."
   exit 0
