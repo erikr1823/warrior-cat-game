@@ -4,12 +4,22 @@ export class AudioSystem {
   constructor() {
     this.context = null;
     this.muted = false;
+    this.masterVolume = 1;
     this.shootCooldown = 0;
     this.music = new Audio(GameConfig.audio.music.menu);
     this.music.loop = true;
     this.music.preload = "auto";
     this.musicStarted = false;
     this.musicState = "menu";
+  }
+
+  setVolume(volume) {
+    this.masterVolume = Math.max(0, Math.min(1, volume));
+    this.applyMusicVolume();
+  }
+
+  getVolume() {
+    return this.masterVolume;
   }
 
   setMuted(muted) {
@@ -32,7 +42,7 @@ export class AudioSystem {
   }
 
   ensureMusic() {
-    if (this.muted || this.musicStarted) {
+    if (this.muted || this.masterVolume <= 0 || this.musicStarted) {
       return;
     }
 
@@ -60,14 +70,20 @@ export class AudioSystem {
 
   applyMusicVolume() {
     const config = GameConfig.audio.music;
+    const base = this.musicState === "menu" ? config.volume : config.gameplayVolume;
+    this.music.volume = this.getEffectiveVolume(base);
+  }
 
-    if (this.muted) {
-      this.music.volume = 0;
-      return;
+  getEffectiveVolume(baseVolume) {
+    if (this.muted || this.masterVolume <= 0) {
+      return 0;
     }
 
-    this.music.volume =
-      this.musicState === "menu" ? config.volume : config.gameplayVolume;
+    return baseVolume * this.masterVolume;
+  }
+
+  scaleVolume(volume) {
+    return this.getEffectiveVolume(volume);
   }
 
   update(deltaTime) {
@@ -75,7 +91,7 @@ export class AudioSystem {
   }
 
   play(type) {
-    if (this.muted) {
+    if (this.muted || this.masterVolume <= 0) {
       return;
     }
 
@@ -113,7 +129,7 @@ export class AudioSystem {
 
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, now);
-    gain.gain.setValueAtTime(volume, now);
+    gain.gain.setValueAtTime(this.scaleVolume(volume), now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     oscillator.connect(gain);
@@ -131,7 +147,7 @@ export class AudioSystem {
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(startFrequency, now);
     oscillator.frequency.exponentialRampToValueAtTime(Math.max(40, endFrequency), now + duration);
-    gain.gain.setValueAtTime(volume, now);
+    gain.gain.setValueAtTime(this.scaleVolume(volume), now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     oscillator.connect(gain);
@@ -149,7 +165,7 @@ export class AudioSystem {
 
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(frequency, start);
-      gain.gain.setValueAtTime(volume, start);
+      gain.gain.setValueAtTime(this.scaleVolume(volume), start);
       gain.gain.exponentialRampToValueAtTime(0.001, start + noteDuration);
 
       oscillator.connect(gain);

@@ -34,7 +34,7 @@ function Join-Source($base, $relative) {
   Join-Path $base ($relative -replace "/", "\")
 }
 
-Write-Host "Warrior Cat Game Test — enemy pack importer"
+Write-Host "Warrior Cat Game Test - enemy pack importer"
 Write-Host "Destination: $destRoot"
 Write-Host ""
 
@@ -91,4 +91,4 @@ foreach ($packId in $packMaps.Keys) {
   Write-Host ""
 }
 
-Write-Host "Done. Hard refresh the game (Ctrl+Shift+R)."
+Write-Host "Done. Hard refresh the game."

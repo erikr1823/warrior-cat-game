@@ -37,10 +37,36 @@ export class Player {
     this.magnetRadius = config.magnetRadius;
     this.invincibilityTime = 0;
     this.invincibilityDuration = config.invincibilityDuration;
+    this.godMode = false;
     this.isDead = false;
+    this.aimDirection = { x: 1, y: 0 };
+    this.dashCooldown = 0;
+    this.dashDuration = 0;
+    this.dashDirection = { x: 0, y: 0 };
+    this.dashSpeed = GameConfig.player.dash.speed;
   }
 
   update(deltaTime, input) {
+    this.dashCooldown = Math.max(0, this.dashCooldown - deltaTime);
+
+    if (this.dashDuration > 0) {
+      this.dashDuration = Math.max(0, this.dashDuration - deltaTime);
+      this.position.x += this.dashDirection.x * this.dashSpeed * deltaTime;
+      this.position.y += this.dashDirection.y * this.dashSpeed * deltaTime;
+      this.invincibilityTime = Math.max(
+        this.invincibilityTime,
+        this.dashDuration + (GameConfig.player.dash.invincibilityExtra ?? 0),
+      );
+      this.bumpTime = Math.max(0, this.bumpTime - deltaTime);
+
+      if (this.godMode) {
+        this.health = this.maxHealth;
+        this.isDead = false;
+      }
+
+      return;
+    }
+
     const movement = normalizeVector(input.getMovementVector());
     this.velocity.x = movement.x * this.speed;
     this.velocity.y = movement.y * this.speed;
@@ -50,6 +76,11 @@ export class Player {
     this.bumpTime = Math.max(0, this.bumpTime - deltaTime);
     this.invincibilityTime = Math.max(0, this.invincibilityTime - deltaTime);
     this.isMoving = movement.x !== 0 || movement.y !== 0;
+
+    if (this.godMode) {
+      this.health = this.maxHealth;
+      this.isDead = false;
+    }
 
     if (this.isMoving) {
       this.updateFacing(movement);
@@ -85,7 +116,7 @@ export class Player {
   }
 
   takeDamage(amount, enemyPosition) {
-    if (this.invincibilityTime > 0 || this.isDead) {
+    if (this.godMode || this.invincibilityTime > 0 || this.isDead) {
       return false;
     }
 
@@ -102,6 +133,41 @@ export class Player {
 
   isInvincible() {
     return this.invincibilityTime > 0;
+  }
+
+  tryDash(input) {
+    const dashConfig = GameConfig.player.dash;
+
+    if (this.dashCooldown > 0 || this.dashDuration > 0 || this.isDead) {
+      return false;
+    }
+
+    let direction = normalizeVector(input.getMovementVector());
+
+    if (direction.x === 0 && direction.y === 0) {
+      direction = normalizeVector(this.aimDirection);
+    }
+
+    if (direction.x === 0 && direction.y === 0) {
+      return false;
+    }
+
+    this.dashDirection = direction;
+    this.dashDuration = dashConfig.duration;
+    this.dashCooldown = dashConfig.cooldown;
+    this.invincibilityTime = dashConfig.duration + (dashConfig.invincibilityExtra ?? 0);
+    this.updateFacing(direction);
+    return true;
+  }
+
+  getDashCooldownProgress() {
+    const dashConfig = GameConfig.player.dash;
+
+    if (this.dashCooldown <= 0) {
+      return 1;
+    }
+
+    return 1 - this.dashCooldown / dashConfig.cooldown;
   }
 
   addXP(amount, game = null) {

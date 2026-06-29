@@ -1,3 +1,4 @@
+import { normalizeVector } from "../core/MathUtils.js";
 import { GameConfig } from "../config/GameConfig.js";
 import { TouchControls } from "./TouchControls.js";
 
@@ -8,6 +9,8 @@ export class Input {
     this.justPressedKeys = new Set();
     this.mousePosition = { x: 0, y: 0 };
     this.mouseClicked = false;
+    this.pointerHeld = false;
+    this.lastAimDirection = { x: 1, y: 0 };
     this.touch = new TouchControls(GameConfig.resolution.width, GameConfig.resolution.height);
 
     window.addEventListener("keydown", (event) => {
@@ -37,6 +40,11 @@ export class Input {
     canvas.addEventListener("mousedown", (event) => {
       this.mousePosition = this.getCanvasPoint(event);
       this.mouseClicked = true;
+      this.pointerHeld = true;
+    });
+
+    window.addEventListener("mouseup", () => {
+      this.pointerHeld = false;
     });
 
     canvas.addEventListener(
@@ -45,6 +53,7 @@ export class Input {
         this.handleTouchEvent(event);
         this.touch.handleTouchStart(event, (touch) => this.getCanvasPoint(touch));
         this.syncPointerFromTouch(event);
+        this.pointerHeld = true;
       },
       { passive: false },
     );
@@ -63,17 +72,20 @@ export class Input {
       this.touch.handleTouchEnd(event, (touch) => this.getCanvasPoint(touch));
       this.applyTouchTap();
       this.syncPointerFromTouch(event);
+      this.pointerHeld = event.touches.length > 0;
     });
 
     canvas.addEventListener("touchcancel", (event) => {
       this.touch.handleTouchCancel(event);
       this.syncPointerFromTouch(event);
+      this.pointerHeld = event.touches.length > 0;
     });
 
     window.addEventListener("blur", () => {
       this.keys.clear();
       this.justPressedKeys.clear();
       this.mouseClicked = false;
+      this.pointerHeld = false;
       this.touch.resetJoystick();
       this.touch.actionHeld = false;
     });
@@ -133,6 +145,61 @@ export class Input {
     }
 
     return touch;
+  }
+
+  isMouseInCanvas() {
+    return (
+      this.mousePosition.x >= 0 &&
+      this.mousePosition.x <= this.canvas.width &&
+      this.mousePosition.y >= 0 &&
+      this.mousePosition.y <= this.canvas.height
+    );
+  }
+
+  getWorldAimDirection(playerPosition, camera) {
+    if (!this.isMouseInCanvas()) {
+      return {
+        direction: this.lastAimDirection,
+        valid: false,
+      };
+    }
+
+    const worldPoint = camera.screenToWorld(this.mousePosition);
+    const direction = normalizeVector({
+      x: worldPoint.x - playerPosition.x,
+      y: worldPoint.y - playerPosition.y,
+    });
+
+    if (direction.x !== 0 || direction.y !== 0) {
+      this.lastAimDirection = direction;
+    }
+
+    return {
+      direction: this.lastAimDirection,
+      valid: true,
+    };
+  }
+
+  wasDashJustPressed() {
+    return (
+      this.justPressedKeys.has("ShiftLeft") ||
+      this.justPressedKeys.has("ShiftRight") ||
+      this.justPressedKeys.has("Space")
+    );
+  }
+
+  consumeManualShootClick() {
+    if (!this.mouseClicked) {
+      return false;
+    }
+
+    if (this.shouldBlockTapAt(this.mousePosition)) {
+      this.mouseClicked = false;
+      return false;
+    }
+
+    this.mouseClicked = false;
+    return true;
   }
 
   getKeyboardMovementVector() {
@@ -207,6 +274,10 @@ export class Input {
     );
   }
 
+  isPointerHeld() {
+    return this.pointerHeld;
+  }
+
   consumeClick() {
     const wasClicked = this.mouseClicked;
 
@@ -215,6 +286,16 @@ export class Input {
       return false;
     }
 
+    this.mouseClicked = false;
+    return wasClicked;
+  }
+
+  consumeUiClick(rectangle) {
+    if (!this.isMouseOver(rectangle)) {
+      return false;
+    }
+
+    const wasClicked = this.mouseClicked;
     this.mouseClicked = false;
     return wasClicked;
   }
@@ -248,6 +329,8 @@ function isGameKey(code) {
     code === "ArrowDown" ||
     code === "Enter" ||
     code === "Space" ||
+    code === "ShiftLeft" ||
+    code === "ShiftRight" ||
     code === "KeyR" ||
     code === "Escape" ||
     code === "KeyP" ||

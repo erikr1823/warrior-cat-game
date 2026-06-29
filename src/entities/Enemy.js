@@ -8,6 +8,7 @@ export class Enemy {
     const healthMultiplier = modifiers.healthMultiplier ?? 1;
     const speedMultiplier = modifiers.speedMultiplier ?? 1;
     const enemyPack = modifiers.enemyPack ?? "ink";
+    const visualType = config.visualType ?? type;
 
     this.type = type;
     this.enemyPack = enemyPack;
@@ -19,7 +20,7 @@ export class Enemy {
     this.health = this.maxHealth;
     this.speed = config.speed * speedMultiplier;
     this.damage = config.damage;
-    this.renderSize = getEnemyRenderSize(type, enemyPack);
+    this.renderSize = config.renderSize ?? getEnemyRenderSize(visualType, enemyPack);
     this.collisionRadius = config.collisionRadius;
     this.radius = this.collisionRadius;
     this.animTime = Math.random() * 2;
@@ -27,12 +28,21 @@ export class Enemy {
     this.hitFlashTime = 0;
     this.knockbackVelocity = { x: 0, y: 0 };
     this.isElite = type === "elite";
-    this.isBoss = type === "boss";
+    this.isBoss = Boolean(modifiers.isBoss ?? config.isBoss);
     this.bossIndex = modifiers.bossIndex ?? 1;
+    this.spriteSet = getEnemyVisualSet(visualType, enemyPack);
+    this.facing = "down";
   }
 
   getCurrentSprite() {
-    const spriteSet = getEnemyVisualSet(this.type, this.enemyPack);
+    const spriteSet = this.spriteSet;
+
+    if (spriteSet.directional) {
+      const directionFrames = spriteSet.directions[this.facing] ?? spriteSet.directions.down;
+      const frameIndex = Math.floor(this.animTime * 8) % directionFrames.length;
+      return directionFrames[frameIndex];
+    }
+
     const frameIndex = Math.floor(this.animTime * 6) % spriteSet.frameCount;
     return spriteSet.frames[frameIndex];
   }
@@ -48,6 +58,19 @@ export class Enemy {
     this.knockbackVelocity.y *= Math.max(0, 1 - GameConfig.enemies.knockbackFriction * deltaTime);
     this.hitFlashTime = Math.max(0, this.hitFlashTime - deltaTime);
     this.animTime += deltaTime;
+
+    if (Math.abs(direction.x) > 0.05 || Math.abs(direction.y) > 0.05) {
+      this.updateFacing(direction);
+    }
+  }
+
+  updateFacing(movement) {
+    if (Math.abs(movement.x) > Math.abs(movement.y)) {
+      this.facing = movement.x > 0 ? "right" : "left";
+      return;
+    }
+
+    this.facing = movement.y > 0 ? "down" : "up";
   }
 
   takeDamage(amount, direction) {

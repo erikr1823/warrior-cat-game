@@ -1,0 +1,62 @@
+﻿{
+    "enemies":  {
+
+                },
+    "version":  1,
+    "tilesets":  {
+                     "graveyard":  {
+                                       "stone":  [
+
+                                                 ],
+                                       "grass":  [
+
+                                                 ],
+                                       "moss":  [
+
+                                                ]
+                                   },
+                     "dungeon":  {
+                                     "stone":  [
+
+                                               ],
+                                     "grass":  [
+
+                                               ],
+                                     "moss":  [
+
+                                              ]
+                                 },
+                     "forest":  {
+                                    "stone":  [
+
+                                              ],
+                                    "grass":  [
+
+                                              ],
+                                    "moss":  [
+
+                                             ]
+                                },
+                     "castle":  {
+                                    "stone":  [
+
+                                              ],
+                                    "grass":  [
+
+                                              ],
+                                    "moss":  [
+
+                                             ]
+                                }
+                 },
+    "sourcePacks":  [
+
+                    ],
+    "generatedAt":  "2026-06-29T00:14:29.1957036-04:00",
+    "props":  {
+
+              },
+    "ui":  {
+
+           }
+}

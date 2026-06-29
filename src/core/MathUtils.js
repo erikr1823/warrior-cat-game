@@ -28,6 +28,12 @@ export function distanceBetween(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+export function distanceBetweenSq(a, b) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return dx * dx + dy * dy;
+}
+
 export function directionBetween(from, to) {
   return normalizeVector({
     x: to.x - from.x,
@@ -36,7 +42,8 @@ export function directionBetween(from, to) {
 }
 
 export function circlesOverlap(a, b) {
-  return distanceBetween(a.position, b.position) <= a.radius + b.radius;
+  const radius = a.radius + b.radius;
+  return distanceBetweenSq(a.position, b.position) <= radius * radius;
 }
 
 export function formatTime(seconds) {

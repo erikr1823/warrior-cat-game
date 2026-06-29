@@ -1,5 +1,6 @@
 import { directionBetween } from "../core/MathUtils.js";
 import { GameConfig } from "../config/GameConfig.js";
+import { getGodModeDamage, isGodMode } from "../debug/GodMode.js";
 import { DamageNumber } from "../entities/DamageNumber.js";
 import { XPGem } from "../entities/XPGem.js";
 import { Chest } from "../entities/Chest.js";
@@ -11,7 +12,8 @@ export function damageEnemy(game, enemy, damage, direction = null) {
   }
 
   const hitDirection = direction ?? directionBetween(game.player.position, enemy.position);
-  const finalDamage = Math.round(damage * (game.runModifiers?.damageMultiplier ?? 1));
+  const baseDamage = Math.round(damage * (game.runModifiers?.damageMultiplier ?? 1));
+  const finalDamage = isGodMode(game) ? getGodModeDamage(game, baseDamage, enemy) : baseDamage;
 
   enemy.takeDamage(finalDamage, hitDirection);
   game.damageNumbers.push(
@@ -32,6 +34,7 @@ export function damageEnemy(game, enemy, damage, direction = null) {
 
   if (enemy.isBoss) {
     game.bossDefeatedCount += 1;
+    game.spawner.getBossDirector().onBossDefeated(enemy);
     game.chests.push(new Chest(enemy.position.x, enemy.position.y));
     game.xpGems.push(new XPGem(enemy.position.x, enemy.position.y - 24, "red"));
     game.coinPickups.push(

@@ -3,12 +3,31 @@ import { AudioSystem } from "./AudioSystem.js";
 import { ParticleSystem } from "./ParticleSystem.js";
 
 const DEATH_COLORS = {
-  slime: "#9b7dff",
+  slime: "#68a850",
+  zombie: "#7a9a68",
+  brainZombie: "#b86868",
+  vikingUndead: "#8898a8",
+  skeletonUndead: "#d0d4dc",
+  popstarUndead: "#e868a8",
+  knightUndead: "#788898",
+  greenDragon: "#58a848",
+  polarDogBoss: "#d8e4f0",
+  spottedDogBoss: "#d0a858",
+  reaperBoss: "#686878",
+  skeletonCaptain: "#d0d4dc",
   bat: "#d8c4a0",
   brute: "#6a5040",
   crawler: "#8a78c8",
   elite: "#ffc86a",
   boss: "#ff6a58",
+  wolfPouncer: "#9ec4e8",
+  skeletonArcher: "#c8d0d8",
+  shieldBrute: "#788898",
+  goblinRunner: "#78a858",
+  necromancer: "#a868c8",
+  fireImp: "#ff7848",
+  iceWraith: "#88d8ff",
+  castleKnight: "#b8a878",
 };
 
 export class FeedbackSystem {
@@ -17,11 +36,38 @@ export class FeedbackSystem {
     this.audio = new AudioSystem();
     this.particles = new ParticleSystem(GameConfig.feedback.maxParticles ?? 180);
     this.lowHealthPulse = 0;
-    this.syncMuteFromSave();
+    this.syncSettingsFromSave();
+  }
+
+  syncSettingsFromSave() {
+    this.audio.setMuted(Boolean(this.game.saveData.settings?.muted));
+    const savedVolume = Number(this.game.saveData.settings?.volume);
+    this.audio.setVolume(Number.isFinite(savedVolume) ? savedVolume : 1);
   }
 
   syncMuteFromSave() {
-    this.audio.setMuted(Boolean(this.game.saveData.settings?.muted));
+    this.syncSettingsFromSave();
+  }
+
+  setVolume(volume) {
+    const clamped = Math.max(0, Math.min(1, volume));
+    this.audio.setVolume(clamped);
+
+    const previous = Number(this.game.saveData.settings?.volume ?? 1);
+    if (Math.abs(previous - clamped) < 0.005) {
+      return clamped;
+    }
+
+    this.game.saveData.settings = {
+      ...this.game.saveData.settings,
+      volume: clamped,
+    };
+    this.game.saveSystem.save(this.game.saveData);
+    return clamped;
+  }
+
+  getVolume() {
+    return this.audio.getVolume();
   }
 
   toggleMute() {
@@ -40,7 +86,7 @@ export class FeedbackSystem {
   }
 
   ensureAudio() {
-    if (!this.audio.isMuted()) {
+    if (!this.audio.isMuted() && this.audio.getVolume() > 0) {
       this.audio.ensureContext();
       this.audio.ensureMusic();
     }

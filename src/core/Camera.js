@@ -10,6 +10,13 @@ export class Camera {
     this.position.y = targetPosition.y - this.height / 2;
   }
 
+  screenToWorld(screenPosition) {
+    return {
+      x: screenPosition.x + this.position.x,
+      y: screenPosition.y + this.position.y,
+    };
+  }
+
   worldToScreen(position) {
     return {
       x: position.x - this.position.x,

@@ -23,6 +23,9 @@ import { WorldMap } from "../systems/WorldMap.js";
 import { FeedbackSystem } from "../systems/FeedbackSystem.js";
 import { ProjectilePool } from "../systems/ProjectilePool.js";
 import { removeDeadInPlace } from "./EntityCleanup.js";
+import { BiomeAmbienceSystem } from "../systems/BiomeAmbienceSystem.js";
+import { DebugChatSystem } from "../systems/DebugChatSystem.js";
+import { applyGodModeToPlayer } from "../debug/GodMode.js";
 import { preloadEnemyArt } from "../assets/EnemyVisuals.js";
 
 export class Game {
@@ -51,6 +54,10 @@ export class Game {
     this.pauseMenu = new PauseMenuSystem(this.context, this.width, this.height);
     this.ui = new UISystem(this.context, this.width, this.height);
     this.worldMap = new WorldMap();
+    this.biomeAmbience = new BiomeAmbienceSystem(this.width, this.height);
+    this.debugChat = new DebugChatSystem(this.context, this.width, this.height);
+    this.godMode = false;
+    this.timeScale = 1;
     this.feedback = new FeedbackSystem(this);
     this.projectilePool = new ProjectilePool();
     this.runSummary = null;
@@ -77,6 +84,7 @@ export class Game {
       const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.1);
       this.lastTime = currentTime;
       this.updateFPS(deltaTime);
+      this.handleAudioControls();
 
       if (this.state === "menu") {
         this.updateMenu();
@@ -107,12 +115,18 @@ export class Game {
     requestAnimationFrame((time) => this.loop(time));
   }
 
-  updateMenu() {
-    this.feedback.ensureAudio();
+  handleAudioControls() {
+    this.ui.handleVolumeSlider(this.input, this.feedback.getVolume(), (volume) => {
+      this.feedback.setVolume(volume);
+    });
 
     if (this.ui.consumeMuteClick(this.input)) {
       this.feedback.toggleMute();
     }
+  }
+
+  updateMenu() {
+    this.feedback.ensureAudio();
 
     if (this.menu.update(this.input)) {
       this.feedback.ensureAudio();
@@ -122,10 +136,6 @@ export class Game {
 
   updateShop() {
     this.feedback.ensureAudio();
-
-    if (this.ui.consumeMuteClick(this.input)) {
-      this.feedback.toggleMute();
-    }
 
     const action = this.shop.update(this.input, this.saveData, this.metaUpgradeSystem, this.saveSystem);
 
@@ -138,10 +148,6 @@ export class Game {
     this.updateScreenShake(deltaTime);
     this.feedback.update(deltaTime);
 
-    if (this.ui.consumeMuteClick(this.input)) {
-      this.feedback.toggleMute();
-    }
-
     if (this.input.isRestartPressed() || this.ui.consumeGameOverRestartClick(this.input)) {
       this.startRun();
       return;
@@ -153,9 +159,7 @@ export class Game {
   }
 
   updateLevelUp() {
-    if (this.ui.consumeMuteClick(this.input)) {
-      this.feedback.toggleMute();
-    }
+    this.ui.layoutUpgradeChoiceCards(this.levelUpChoices);
 
     const keyboardChoice = this.input.getChoicePressed();
     const clickedChoice = this.ui.getClickedUpgradeChoice(this.input);
@@ -167,8 +171,10 @@ export class Game {
   }
 
   updatePaused() {
-    if (this.ui.consumeMuteClick(this.input)) {
-      this.feedback.toggleMute();
+    this.syncGodMode();
+
+    if (this.debugChat.update(this, this.input)) {
+      return;
     }
 
     if (this.input.wasPauseJustPressed()) {
@@ -239,10 +245,6 @@ export class Game {
     this.feedback.update(deltaTime);
     this.chestAnimation.time += deltaTime;
 
-    if (this.ui.consumeMuteClick(this.input)) {
-      this.feedback.toggleMute();
-    }
-
     const animationConfig = GameConfig.chests.animation;
     const canContinue = this.chestAnimation.time >= animationConfig.revealDelay + 0.12;
 
@@ -259,33 +261,48 @@ export class Game {
   }
 
   update(deltaTime) {
+    this.syncGodMode();
+
+    if (this.debugChat.update(this, this.input)) {
+      return;
+    }
+
     if (this.tryOpenPauseFromInput()) {
       return;
     }
 
-    this.survivalTime += deltaTime;
-    this.updateScreenShake(deltaTime);
-    this.feedback.update(deltaTime);
-    this.player.update(deltaTime, this.input);
+    const step = deltaTime * this.timeScale;
+
+    this.survivalTime += step;
+    this.updateScreenShake(step);
+    this.feedback.update(step);
+    const aim = this.input.getWorldAimDirection(this.player.position, this.camera);
+    this.player.aimDirection = aim.direction;
+
+    if (this.input.wasDashJustPressed()) {
+      this.player.tryDash(this.input);
+    }
+
+    this.player.update(step, this.input);
+
+    if (this.input.consumeManualShootClick()) {
+      this.weaponSystem.fireManualInkFlick(this, this.player.aimDirection);
+    }
 
     if (this.input.consumeTouchAttackPress()) {
-      this.weaponSystem.triggerManualBurst();
+      this.weaponSystem.fireManualInkFlick(this, this.player.aimDirection);
     }
 
-    if (this.ui.consumeMuteClick(this.input)) {
-      this.feedback.toggleMute();
-    }
     this.worldMap.clampPosition(this.player.position);
     this.camera.follow(this.player.position);
-    this.spawner.update(deltaTime, this);
-    this.weaponSystem.update(deltaTime, this);
+    this.spawner.update(step, this);
 
     for (const enemy of this.enemies) {
-      enemy.update(deltaTime, this.player);
+      enemy.update(step, this.player);
     }
 
     for (const projectile of this.projectiles) {
-      projectile.update(deltaTime);
+      projectile.update(step);
 
       if (isOffScreen(projectile.position, this.camera, this.width, this.height)) {
         projectile.isDead = true;
@@ -293,24 +310,47 @@ export class Game {
     }
 
     for (const damageNumber of this.damageNumbers) {
-      damageNumber.update(deltaTime);
+      damageNumber.update(step);
     }
 
     for (const xpGem of this.xpGems) {
-      xpGem.update(deltaTime, this.player, this);
+      xpGem.update(step, this.player, this);
     }
 
     for (const coinPickup of this.coinPickups) {
-      coinPickup.update(deltaTime, this.player, this);
+      coinPickup.update(step, this.player, this);
     }
 
     for (const chest of this.chests) {
-      chest.update(deltaTime);
+      chest.update(step);
     }
 
-    this.collisionSystem.update(deltaTime, this);
+    this.collisionSystem.prepareFrame(this.enemies);
+    this.weaponSystem.update(step, this);
+    this.collisionSystem.update(step, this);
     this.removeDeadEntities();
     this.processLevelUps();
+
+    const currentWorld = this.spawner.getWaveDirector().getCurrentWorld(this.survivalTime);
+    this.biomeAmbience.update(step, this.camera, currentWorld);
+  }
+
+  applyWorldTheme(currentWorld) {
+    if (typeof this.worldMap.applyWorld === "function") {
+      this.worldMap.applyWorld(currentWorld);
+      return;
+    }
+
+    const paletteId = currentWorld?.tilePalette ?? "castleCourtyard";
+    this.worldMap.setTilePalette(paletteId);
+
+    if (currentWorld?.id) {
+      this.worldMap.activeWorldId = currentWorld.id;
+    }
+
+    if (currentWorld?.decorationTypes?.length > 0) {
+      this.worldMap.activeDecorationTypes = currentWorld.decorationTypes;
+    }
   }
 
   render() {
@@ -318,14 +358,14 @@ export class Game {
 
     if (this.state === "menu") {
       this.menu.draw(this.input);
-      this.ui.drawMuteButton(this.feedback.isMuted());
+      this.ui.drawAudioControls(this.feedback.isMuted(), this.feedback.getVolume());
       this.input.drawTouchControls(this.context, this.state);
       return;
     }
 
     if (this.state === "shop") {
       this.shop.draw(this.input, this.saveData, this.metaUpgradeSystem);
-      this.ui.drawMuteButton(this.feedback.isMuted());
+      this.ui.drawAudioControls(this.feedback.isMuted(), this.feedback.getVolume());
       this.input.drawTouchControls(this.context, this.state);
       return;
     }
@@ -342,8 +382,9 @@ export class Game {
     }
     this.renderer.setShake(this.screenShake);
     const currentWorld = this.spawner.getWaveDirector().getCurrentWorld(this.survivalTime);
-    this.worldMap.setTilePalette(currentWorld.tilePalette);
-    this.renderer.drawBackground(this.camera, this.worldMap);
+    this.applyWorldTheme(currentWorld);
+    this.renderer.drawBackground(this.camera, this.worldMap, currentWorld);
+    this.biomeAmbience.draw(this.context, this.camera);
     this.renderer.drawWeaponEffects(this.weaponSystem, this.player, this.camera);
     this.renderer.drawProjectiles(this.projectiles, this.camera);
     this.renderer.drawXPGems(this.xpGems, this.camera);
@@ -351,6 +392,14 @@ export class Game {
     this.renderer.drawChests(this.chests, this.camera);
     this.renderer.drawEnemies(this.enemies, this.camera);
     this.renderer.drawPlayer(this.player, this.camera);
+    if (this.state === "playing") {
+      this.renderer.drawAimIndicator(
+        this.player,
+        this.camera,
+        this.player.aimDirection,
+        this.input.isMouseInCanvas(),
+      );
+    }
     this.renderer.drawParticles(this.feedback.particles, this.camera);
     this.renderer.drawDamageNumbers(this.damageNumbers, this.camera);
     this.renderer.drawBossHealthBar(this.enemies, this.width);
@@ -376,7 +425,10 @@ export class Game {
         this.spawner.getBossDirector().getAnnouncement() ??
         this.spawner.getWaveDirector().getAnnouncement(),
       muted: this.feedback.isMuted(),
+      volume: this.feedback.getVolume(),
       lowHealthPulse: this.feedback.getLowHealthPulse(),
+      dashCooldownProgress: this.player.getDashCooldownProgress(),
+      manualShotCooldownProgress: this.weaponSystem.getManualShotCooldownProgress(),
       projectileCount: this.projectiles.length,
       particleCount: this.feedback.particles.particles.length,
       pickupCount: this.xpGems.length + this.coinPickups.length,
@@ -404,6 +456,7 @@ export class Game {
       this.player.maxHealth,
       this.feedback.getLowHealthPulse(),
     );
+    this.debugChat.draw(this);
     this.input.drawTouchControls(this.context, this.state);
   }
 
@@ -417,6 +470,8 @@ export class Game {
   }
 
   resetRun() {
+    const keepGodMode = this.godMode;
+    const keepTimeScale = this.timeScale;
     this.survivalTime = 0;
     this.killCount = 0;
     this.bossDefeatedCount = 0;
@@ -443,6 +498,8 @@ export class Game {
     this.chestReward = null;
     this.chestAnimation = null;
     this.runSummary = null;
+    this.godMode = keepGodMode;
+    this.timeScale = keepGodMode ? keepTimeScale : 1;
     this.spawner = new Spawner(this.camera);
     this.weaponSystem = new WeaponSystem();
     this.passiveSystem = new PassiveSystem();
@@ -452,6 +509,17 @@ export class Game {
     this.metaUpgradeSystem.applyToRun(this);
     applyCharacterToRun(this);
     this.camera.follow(this.player.position);
+    this.syncGodMode();
+  }
+
+  setGodMode(enabled, timeScale = 1) {
+    this.godMode = Boolean(enabled);
+    this.timeScale = enabled ? timeScale : 1;
+    this.syncGodMode();
+  }
+
+  syncGodMode() {
+    applyGodModeToPlayer(this);
   }
 
   startRun() {
@@ -473,7 +541,7 @@ export class Game {
   }
 
   endRun() {
-    if (this.state === "gameOver") {
+    if (this.state === "gameOver" || this.godMode) {
       return;
     }
 
@@ -508,6 +576,7 @@ export class Game {
       this.player.levelUpOnce();
       this.finalLevel = this.player.level;
       this.levelUpChoices = this.upgradeSystem.getChoices(3, this);
+      this.ui.layoutUpgradeChoiceCards(this.levelUpChoices);
       this.feedback.onLevelUp();
       this.state = "levelUp";
       return;

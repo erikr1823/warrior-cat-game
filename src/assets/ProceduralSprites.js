@@ -1,3 +1,4 @@
+import { ENEMY_TYPES } from "../config/EnemyArtDefinitions.js";
 import { GameConfig } from "../config/GameConfig.js";
 
 const SIZE = GameConfig.sprites.sourceSize;
@@ -238,48 +239,22 @@ function buildPlayerFrames() {
 }
 
 function drawSlime(ctx, cx, cy, frame) {
-  const squash = frame === 0 ? 1 : 0.88;
-  const stretch = frame === 0 ? 1 : 1.1;
-  shadow(ctx, cx, cy + 54, 52, 12);
+  const hop = frame === 0 ? 0 : -4;
+  shadow(ctx, cx, cy + 54, 40, 10);
 
-  const body = ctx.createRadialGradient(cx - 12, cy - 20, 8, cx, cy + 4, 68);
-  body.addColorStop(0, "#c8b0ff");
-  body.addColorStop(0.5, "#6a48a8");
-  body.addColorStop(1, "#2a1848");
-
-  ctx.fillStyle = body;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 8, 58 * squash, 50 * stretch, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(200, 176, 255, 0.45)";
-  ctx.beginPath();
-  ctx.ellipse(cx - 18, cy - 8, 22, 14, -0.4, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "#e8dcff";
-  ctx.beginPath();
-  ctx.ellipse(cx - 20, cy + 2, 12, 16, 0, 0, Math.PI * 2);
-  ctx.ellipse(cx + 20, cy + 2, 12, 16, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "#1a3028";
-  ctx.beginPath();
-  ctx.arc(cx - 20, cy + 6, 5, 0, Math.PI * 2);
-  ctx.arc(cx + 20, cy + 6, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#fff";
-  ctx.beginPath();
-  ctx.arc(cx - 22, cy + 4, 2, 0, Math.PI * 2);
-  ctx.arc(cx + 18, cy + 4, 2, 0, Math.PI * 2);
-  ctx.fill();
-
-  if (frame === 1) {
-    ctx.fillStyle = "rgba(92, 184, 106, 0.55)";
-    ctx.beginPath();
-    ctx.ellipse(cx + 34, cy + 38, 8, 14, 0.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.fillStyle = "#4a7838";
+  ctx.fillRect(cx - 22, cy + 4 + hop, 44, 28);
+  ctx.fillRect(cx - 18, cy - 8 + hop, 36, 16);
+  ctx.fillStyle = "#68a850";
+  ctx.fillRect(cx - 14, cy - 16 + hop, 28, 12);
+  ctx.fillStyle = "#88c868";
+  ctx.fillRect(cx - 8, cy - 20 + hop, 16, 6);
+  ctx.fillStyle = "#1a2818";
+  ctx.fillRect(cx - 10, cy - 4 + hop, 6, 6);
+  ctx.fillRect(cx + 4, cy - 4 + hop, 6, 6);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(cx - 8, cy - 6 + hop, 2, 2);
+  ctx.fillRect(cx + 6, cy - 6 + hop, 2, 2);
 }
 
 function drawBat(ctx, cx, cy, frame) {
@@ -513,13 +488,373 @@ function drawBoss(ctx, cx, cy, frame) {
   ctx.fill();
 }
 
+function drawWolfPouncer(ctx, cx, cy, frame) {
+  const lunge = frame === 1 ? 8 : 0;
+  shadow(ctx, cx - lunge * 0.4, cy + 54, 58, 11);
+  ctx.fillStyle = "#6888a8";
+  ctx.beginPath();
+  ctx.ellipse(cx - 8 - lunge, cy + 10, 42, 24, -0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#486880";
+  ctx.beginPath();
+  ctx.moveTo(cx + 18 - lunge, cy - 6);
+  ctx.lineTo(cx + 46 - lunge, cy + 2);
+  ctx.lineTo(cx + 18 - lunge, cy + 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#9ec4e8";
+  ctx.beginPath();
+  ctx.arc(cx - 18 - lunge, cy - 8, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ffd27e";
+  ctx.beginPath();
+  ctx.arc(cx - 24 - lunge, cy - 10, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawSkeletonArcher(ctx, cx, cy, frame) {
+  const aim = frame === 1 ? 4 : 0;
+  shadow(ctx, cx, cy + 54, 46, 10);
+  ctx.strokeStyle = "#d8e0e8";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 18);
+  ctx.lineTo(cx, cy + 28);
+  ctx.moveTo(cx - 18, cy - 2);
+  ctx.lineTo(cx + 18 + aim, cy - 2);
+  ctx.moveTo(cx, cy + 8);
+  ctx.lineTo(cx - 12, cy + 34);
+  ctx.moveTo(cx, cy + 8);
+  ctx.lineTo(cx + 12, cy + 34);
+  ctx.stroke();
+  ctx.fillStyle = "#eef4f8";
+  ctx.beginPath();
+  ctx.arc(cx, cy - 22, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#8a98a8";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx + 10 + aim, cy - 2);
+  ctx.lineTo(cx + 34 + aim, cy - 8);
+  ctx.stroke();
+}
+
+function drawShieldBrute(ctx, cx, cy, frame) {
+  drawBrute(ctx, cx, cy, frame);
+  ctx.fillStyle = "#788898";
+  ctx.fillRect(cx - 42, cy - 8, 18, 34);
+  ctx.strokeStyle = "#ffd27e";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(cx - 42, cy - 8, 18, 34);
+}
+
+function drawGoblinRunner(ctx, cx, cy, frame) {
+  const run = frame === 1 ? 6 : 0;
+  shadow(ctx, cx, cy + 50, 34, 9);
+  ctx.fillStyle = "#68a848";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 6, 28, 22, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#88c868";
+  ctx.beginPath();
+  ctx.arc(cx, cy - 12, 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ffd27e";
+  ctx.beginPath();
+  ctx.arc(cx - 6, cy - 14, 4, 0, Math.PI * 2);
+  ctx.arc(cx + 6, cy - 14, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(cx - 10 + run, cy + 18, 8, 14);
+  ctx.fillRect(cx + 2 - run, cy + 18, 8, 14);
+}
+
+function drawNecromancer(ctx, cx, cy, frame) {
+  const pulse = frame === 1 ? 4 : 0;
+  ctx.fillStyle = "rgba(120, 72, 180, 0.12)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, 70 + pulse, 0, Math.PI * 2);
+  ctx.fill();
+  shadow(ctx, cx, cy + 54, 48, 11);
+  ctx.fillStyle = "#3a2850";
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 34);
+  ctx.lineTo(cx + 24, cy + 28);
+  ctx.lineTo(cx - 24, cy + 28);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#a868c8";
+  ctx.beginPath();
+  ctx.arc(cx, cy - 18, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#88ff88";
+  ctx.beginPath();
+  ctx.arc(cx - 5, cy - 18, 3, 0, Math.PI * 2);
+  ctx.arc(cx + 7, cy - 18, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawFireImp(ctx, cx, cy, frame) {
+  const flicker = frame === 1 ? 1 : 0;
+  shadow(ctx, cx, cy + 50, 36, 9);
+  ctx.fillStyle = "#ff7848";
+  ctx.beginPath();
+  ctx.moveTo(cx - 16, cy + 16);
+  ctx.quadraticCurveTo(cx, cy - 28 - flicker * 8, cx + 16, cy + 16);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#ffd27e";
+  ctx.beginPath();
+  ctx.arc(cx, cy + 4, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#241018";
+  ctx.beginPath();
+  ctx.arc(cx - 5, cy + 2, 3, 0, Math.PI * 2);
+  ctx.arc(cx + 5, cy + 2, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawIceWraith(ctx, cx, cy, frame) {
+  const drift = frame === 1 ? 5 : 0;
+  ctx.fillStyle = "rgba(136, 216, 255, 0.12)";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 52 + drift, 44, 0, 0, Math.PI * 2);
+  ctx.fill();
+  shadow(ctx, cx, cy + 52, 40, 8);
+  ctx.fillStyle = "rgba(184, 228, 255, 0.82)";
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 28);
+  ctx.quadraticCurveTo(cx + 28, cy + 8, cx, cy + 24);
+  ctx.quadraticCurveTo(cx - 28, cy + 8, cx, cy - 28);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(cx - 8, cy - 4, 5, 0, Math.PI * 2);
+  ctx.arc(cx + 8, cy - 4, 5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawCastleKnight(ctx, cx, cy, frame) {
+  const march = frame === 1 ? 3 : 0;
+  shadow(ctx, cx, cy + 56, 52, 12);
+  ctx.fillStyle = "#788898";
+  ctx.fillRect(cx - 18, cy - 8, 36, 34);
+  ctx.fillStyle = "#b8a878";
+  ctx.beginPath();
+  ctx.arc(cx, cy - 18, 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#486878";
+  ctx.fillRect(cx - 22, cy - 24, 44, 10);
+  ctx.fillStyle = "#d8d0b8";
+  ctx.fillRect(cx + 18, cy - 6 + march, 6, 38);
+  ctx.fillStyle = "#686e78";
+  ctx.fillRect(cx - 14 + march, cy + 24, 10, 18);
+  ctx.fillRect(cx + 4 - march, cy + 24, 10, 18);
+}
+
+function drawZombie(ctx, cx, cy, frame) {
+  const march = frame % 2 === 0 ? 0 : 3;
+  shadow(ctx, cx, cy + 54, 46, 12);
+
+  ctx.fillStyle = "#6a8860";
+  ctx.fillRect(cx - 18, cy - 8 + march, 36, 44);
+  ctx.fillStyle = "#8aa878";
+  ctx.beginPath();
+  ctx.arc(cx, cy - 22, 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#3a3028";
+  ctx.fillRect(cx - 10, cy - 26, 8, 8);
+  ctx.fillRect(cx + 2, cy - 26, 8, 8);
+  ctx.fillStyle = "#586850";
+  ctx.fillRect(cx - 22 + march, cy + 10, 12, 28);
+  ctx.fillRect(cx + 10 - march, cy + 10, 12, 28);
+}
+
+function drawBrainZombie(ctx, cx, cy, frame) {
+  const march = frame % 2 === 0 ? 0 : 3;
+  shadow(ctx, cx, cy + 54, 46, 12);
+
+  ctx.fillStyle = "#8a8878";
+  ctx.fillRect(cx - 18, cy - 8 + march, 36, 44);
+  ctx.fillStyle = "#a8a090";
+  ctx.beginPath();
+  ctx.arc(cx, cy - 22, 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#c84848";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy - 34, 14, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#3a3028";
+  ctx.fillRect(cx - 10, cy - 26, 8, 8);
+  ctx.fillRect(cx + 2, cy - 26, 8, 8);
+  ctx.fillStyle = "#686858";
+  ctx.fillRect(cx - 22 + march, cy + 10, 12, 28);
+  ctx.fillRect(cx + 10 - march, cy + 10, 12, 28);
+}
+
+function drawVikingUndead(ctx, cx, cy, frame) {
+  const march = frame % 2 === 0 ? 0 : 3;
+  shadow(ctx, cx, cy + 54, 46, 12);
+
+  ctx.fillStyle = "#5a4030";
+  ctx.fillRect(cx - 18, cy - 4 + march, 36, 40);
+  ctx.fillStyle = "#686868";
+  ctx.fillRect(cx - 20, cy - 28 + march, 40, 16);
+  ctx.fillStyle = "#d8d8d8";
+  ctx.fillRect(cx - 24, cy - 34 + march, 10, 14);
+  ctx.fillRect(cx + 14, cy - 34 + march, 10, 14);
+  ctx.fillStyle = "#3a3028";
+  ctx.fillRect(cx - 8, cy - 20 + march, 6, 6);
+  ctx.fillRect(cx + 2, cy - 20 + march, 6, 6);
+  ctx.fillStyle = "#4a3828";
+  ctx.fillRect(cx - 22 + march, cy + 12, 12, 26);
+  ctx.fillRect(cx + 10 - march, cy + 12, 12, 26);
+}
+
+function drawSkeletonUndead(ctx, cx, cy, frame) {
+  const march = frame % 2 === 0 ? 0 : 3;
+  shadow(ctx, cx, cy + 54, 40, 10);
+
+  ctx.fillStyle = "#d8dce8";
+  ctx.fillRect(cx - 4, cy - 24 + march, 8, 14);
+  ctx.fillRect(cx - 14, cy - 12 + march, 28, 22);
+  ctx.fillRect(cx - 18 + march, cy + 4, 8, 24);
+  ctx.fillRect(cx + 10 - march, cy + 4, 8, 24);
+  ctx.fillRect(cx - 16, cy + 24 + march, 10, 14);
+  ctx.fillRect(cx + 6, cy + 24 + march, 10, 14);
+  ctx.fillStyle = "#1a1820";
+  ctx.fillRect(cx - 6, cy - 20 + march, 4, 4);
+  ctx.fillRect(cx + 2, cy - 20 + march, 4, 4);
+}
+
+function drawPopstarUndead(ctx, cx, cy, frame) {
+  const march = frame % 2 === 0 ? 0 : 3;
+  shadow(ctx, cx, cy + 54, 40, 10);
+
+  ctx.fillStyle = "#d84898";
+  ctx.fillRect(cx - 18, cy - 4 + march, 36, 40);
+  ctx.fillStyle = "#f0d848";
+  ctx.fillRect(cx - 14, cy - 22 + march, 28, 14);
+  ctx.fillStyle = "#e8e8f0";
+  ctx.fillRect(cx - 10, cy - 16 + march, 20, 12);
+  ctx.fillStyle = "#282028";
+  ctx.fillRect(cx - 8, cy - 12 + march, 5, 5);
+  ctx.fillRect(cx + 3, cy - 12 + march, 5, 5);
+  ctx.fillStyle = "#282028";
+  ctx.fillRect(cx - 4, cy - 2 + march, 8, 10);
+  ctx.fillStyle = "#d84898";
+  ctx.fillRect(cx - 20 + march, cy + 10, 10, 24);
+  ctx.fillRect(cx + 10 - march, cy + 10, 10, 24);
+}
+
+function drawKnightUndead(ctx, cx, cy, frame) {
+  const march = frame % 2 === 0 ? 0 : 3;
+  shadow(ctx, cx, cy + 54, 44, 10);
+
+  ctx.fillStyle = "#484858";
+  ctx.fillRect(cx - 18, cy - 6 + march, 36, 38);
+  ctx.fillStyle = "#d8dce8";
+  ctx.fillRect(cx - 10, cy - 24 + march, 20, 16);
+  ctx.fillStyle = "#686878";
+  ctx.fillRect(cx - 14, cy - 28 + march, 28, 8);
+  ctx.fillStyle = "#1a1820";
+  ctx.fillRect(cx - 6, cy - 18 + march, 4, 4);
+  ctx.fillRect(cx + 2, cy - 18 + march, 4, 4);
+  ctx.fillStyle = "#383848";
+  ctx.fillRect(cx - 22 + march, cy + 8, 12, 26);
+  ctx.fillRect(cx + 10 - march, cy + 8, 12, 26);
+}
+
+function drawGreenDragon(ctx, cx, cy, frame) {
+  const march = frame % 2 === 0 ? 0 : 2;
+  shadow(ctx, cx, cy + 54, 40, 10);
+
+  ctx.fillStyle = "#488838";
+  ctx.fillRect(cx - 16 + march, cy - 4, 28, 22);
+  ctx.fillRect(cx - 10, cy - 16 + march, 18, 14);
+  ctx.fillStyle = "#68b848";
+  ctx.fillRect(cx - 6, cy + 2 + march, 10, 8);
+  ctx.fillStyle = "#f0a828";
+  ctx.beginPath();
+  ctx.arc(cx - 2, cy + 6 + march, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#e8f0e8";
+  ctx.fillRect(cx + 6, cy - 18 + march, 4, 4);
+  ctx.fillRect(cx + 12, cy - 14 + march, 4, 4);
+}
+
+function drawPolarDogBoss(ctx, cx, cy, frame) {
+  const march = frame % 2 === 0 ? 0 : 2;
+  shadow(ctx, cx, cy + 54, 44, 10);
+
+  ctx.fillStyle = "#e8eef4";
+  ctx.fillRect(cx - 20 + march, cy + 8, 14, 10);
+  ctx.fillRect(cx + 6 - march, cy + 8, 14, 10);
+  ctx.fillRect(cx - 8, cy - 6 + march, 28, 18);
+  ctx.fillRect(cx + 12, cy - 2 + march, 10, 8);
+  ctx.fillStyle = "#c8d0d8";
+  ctx.fillRect(cx - 4, cy + 2 + march, 10, 8);
+  ctx.fillStyle = "#181820";
+  ctx.fillRect(cx + 14, cy - 4 + march, 3, 3);
+}
+
+function drawSpottedDogBoss(ctx, cx, cy, frame) {
+  const march = frame % 2 === 0 ? 0 : 2;
+  shadow(ctx, cx, cy + 54, 44, 10);
+
+  ctx.fillStyle = "#d0a058";
+  ctx.fillRect(cx - 20 + march, cy + 8, 14, 10);
+  ctx.fillRect(cx + 6 - march, cy + 8, 14, 10);
+  ctx.fillRect(cx - 8, cy - 6 + march, 28, 18);
+  ctx.fillRect(cx + 12, cy - 2 + march, 10, 8);
+  ctx.fillStyle = "#684828";
+  ctx.fillRect(cx - 2, cy + march, 4, 4);
+  ctx.fillRect(cx + 6, cy + 4 + march, 4, 4);
+  ctx.fillStyle = "#181820";
+  ctx.fillRect(cx + 14, cy - 4 + march, 3, 3);
+}
+
+function drawReaperBoss(ctx, cx, cy, frame) {
+  const march = frame % 2 === 0 ? 0 : 3;
+  shadow(ctx, cx, cy + 54, 46, 12);
+
+  ctx.fillStyle = "#181820";
+  ctx.fillRect(cx - 16, cy - 20 + march, 32, 48);
+  ctx.fillRect(cx - 20, cy - 28 + march, 40, 14);
+  ctx.fillStyle = "#e8e8f0";
+  ctx.fillRect(cx - 8, cy - 18 + march, 16, 14);
+  ctx.fillStyle = "#181820";
+  ctx.fillRect(cx - 4, cy - 14 + march, 3, 3);
+  ctx.fillRect(cx + 1, cy - 14 + march, 3, 3);
+  ctx.fillStyle = "#686868";
+  ctx.fillRect(cx + 14, cy - 8 + march, 24, 4);
+  ctx.fillRect(cx + 34, cy - 16 + march, 8, 20);
+}
+
 const ENEMY_DRAWERS = {
   slime: drawSlime,
+  zombie: drawZombie,
+  brainZombie: drawBrainZombie,
+  vikingUndead: drawVikingUndead,
+  skeletonUndead: drawSkeletonUndead,
+  popstarUndead: drawPopstarUndead,
+  knightUndead: drawKnightUndead,
+  greenDragon: drawGreenDragon,
+  polarDogBoss: drawPolarDogBoss,
+  spottedDogBoss: drawSpottedDogBoss,
+  reaperBoss: drawReaperBoss,
   bat: drawBat,
   brute: drawBrute,
   crawler: drawCrawler,
   elite: drawElite,
   boss: drawBoss,
+  wolfPouncer: drawWolfPouncer,
+  skeletonArcher: drawSkeletonArcher,
+  shieldBrute: drawShieldBrute,
+  goblinRunner: drawGoblinRunner,
+  necromancer: drawNecromancer,
+  fireImp: drawFireImp,
+  iceWraith: drawIceWraith,
+  castleKnight: drawCastleKnight,
 };
 
 function buildEnemyFrames(type) {
@@ -799,7 +1134,7 @@ export function buildAllSprites() {
   const player = buildPlayerFrames();
   const enemies = {};
 
-  for (const type of ["slime", "bat", "brute", "crawler", "elite", "boss"]) {
+  for (const type of ENEMY_TYPES) {
     enemies[type] = buildEnemyFrames(type);
   }
 

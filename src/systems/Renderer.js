@@ -1,7 +1,6 @@
 import { clamp } from "../core/MathUtils.js";
 import { GameConfig } from "../config/GameConfig.js";
 import { getEffectSprite, getPickupSprite, getProjectileSprite } from "../assets/SpriteCache.js";
-import { getEnemyVisualSet } from "../assets/EnemyVisuals.js";
 
 const SOURCE_SIZE = GameConfig.sprites.sourceSize;
 
@@ -10,6 +9,11 @@ export class Renderer {
     this.context = context;
     this.width = width;
     this.height = height;
+    this.screenScratch = { x: 0, y: 0 };
+    this.cachedVignetteKey = "";
+    this.cachedVignetteGradient = null;
+    this.cachedFogKey = "";
+    this.cachedFogGradient = null;
   }
 
   clear() {
@@ -31,26 +35,70 @@ export class Renderer {
     this.context.restore();
   }
 
-  drawBackground(camera, worldMap) {
+  drawBackground(camera, worldMap, world = null) {
     const ctx = this.context;
 
     worldMap.draw(ctx, camera);
-    this.drawAmbientVignette(ctx);
+    this.drawBiomeAtmosphere(ctx, world);
+    this.drawAmbientVignette(ctx, world);
   }
 
-  drawAmbientVignette(ctx) {
-    const vignette = ctx.createRadialGradient(
-      this.width / 2,
-      this.height / 2,
-      this.height * 0.18,
-      this.width / 2,
-      this.height / 2,
-      this.height * 0.82,
-    );
-    vignette.addColorStop(0, "rgba(8, 10, 14, 0)");
-    vignette.addColorStop(1, "rgba(8, 10, 14, 0.28)");
+  drawBiomeAtmosphere(ctx, world) {
+    if (!world?.ambientOverlayColor && !world?.fogColor) {
+      return;
+    }
 
-    ctx.fillStyle = vignette;
+    if (world.ambientOverlayColor) {
+      ctx.fillStyle = world.ambientOverlayColor;
+      ctx.fillRect(0, 0, this.width, this.height);
+    }
+
+    if (world.fogColor) {
+      const fogKey = `${world.id ?? "default"}:${world.fogColor}`;
+
+      if (this.cachedFogKey !== fogKey) {
+        this.cachedFogKey = fogKey;
+        const fog = ctx.createRadialGradient(
+          this.width / 2,
+          this.height * 0.55,
+          this.height * 0.08,
+          this.width / 2,
+          this.height / 2,
+          this.height * 0.92,
+        );
+        fog.addColorStop(0, "rgba(0, 0, 0, 0)");
+        fog.addColorStop(1, world.fogColor);
+        this.cachedFogGradient = fog;
+      }
+
+      ctx.fillStyle = this.cachedFogGradient;
+      ctx.fillRect(0, 0, this.width, this.height);
+    }
+  }
+
+  drawAmbientVignette(ctx, world = null) {
+    const edgeColor = world?.fogColor ? "rgba(0, 0, 0, 0)" : "rgba(8, 10, 14, 0.28)";
+    const vignetteKey = `${world?.id ?? "default"}:${edgeColor}`;
+
+    if (this.cachedVignetteKey !== vignetteKey) {
+      this.cachedVignetteKey = vignetteKey;
+      const vignette = ctx.createRadialGradient(
+        this.width / 2,
+        this.height / 2,
+        this.height * 0.18,
+        this.width / 2,
+        this.height / 2,
+        this.height * 0.82,
+      );
+      vignette.addColorStop(0, "rgba(8, 10, 14, 0)");
+      vignette.addColorStop(
+        1,
+        edgeColor === "rgba(0, 0, 0, 0)" ? "rgba(8, 10, 14, 0.18)" : edgeColor,
+      );
+      this.cachedVignetteGradient = vignette;
+    }
+
+    ctx.fillStyle = this.cachedVignetteGradient;
     ctx.fillRect(0, 0, this.width, this.height);
   }
 
@@ -109,17 +157,50 @@ export class Renderer {
     });
   }
 
+  drawAimIndicator(player, camera, aimDirection, showAim) {
+    if (!showAim) {
+      return;
+    }
+
+    const ctx = this.context;
+    const screen = camera.worldToScreen(player.position);
+    const length = 56;
+    const originY = screen.y - player.collisionRadius * 0.35;
+    const endX = screen.x + aimDirection.x * length;
+    const endY = originY + aimDirection.y * length;
+
+    ctx.save();
+    ctx.strokeStyle = "rgba(255, 244, 220, 0.28)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(screen.x, originY);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255, 200, 120, 0.45)";
+    ctx.beginPath();
+    ctx.arc(endX, endY, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   drawEnemies(enemies, camera) {
+    const ctx = this.context;
     const margin = 120;
+    const screen = this.screenScratch;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
 
     for (const enemy of enemies) {
-      const screenPosition = camera.worldToScreen(enemy.position);
+      screen.x = enemy.position.x - camera.position.x;
+      screen.y = enemy.position.y - camera.position.y;
 
       if (
-        screenPosition.x < -margin ||
-        screenPosition.x > camera.width + margin ||
-        screenPosition.y < -margin ||
-        screenPosition.y > camera.height + margin
+        screen.x < -margin ||
+        screen.x > camera.width + margin ||
+        screen.y < -margin ||
+        screen.y > camera.height + margin
       ) {
         continue;
       }
@@ -128,63 +209,86 @@ export class Renderer {
       const halfSize = size / 2;
       const sprite = enemy.getCurrentSprite();
 
-      this.context.save();
-      this.context.imageSmoothingEnabled = false;
-
       if (sprite?.image) {
-        this.context.drawImage(
-          sprite.image,
-          sprite.sx,
-          sprite.sy,
-          sprite.sw,
-          sprite.sh,
-          screenPosition.x - halfSize,
-          screenPosition.y - halfSize,
-          size,
-          size,
-        );
-      } else {
-        const sourceSize = getEnemyVisualSet(enemy.type, enemy.enemyPack)?.sourceSize ?? size;
-        this.context.drawImage(
-          sprite,
-          0,
-          0,
-          sourceSize,
-          sourceSize,
-          screenPosition.x - halfSize,
-          screenPosition.y - halfSize,
-          size,
-          size,
-        );
-      }
+        const drawX = screen.x - halfSize;
+        const drawY = screen.y - halfSize;
 
-      this.context.restore();
-
-      if (!enemy.isBoss) {
-        this.drawHealthBar({
-          x: screenPosition.x - 38,
-          y: screenPosition.y - halfSize - 18,
-          width: 76,
-          height: 7,
-          current: enemy.health,
-          max: enemy.maxHealth,
-          fill: getEnemyHealthColor(enemy.type),
-        });
+        if (sprite.flipHorizontal) {
+          ctx.save();
+          ctx.translate(screen.x + halfSize, screen.y - halfSize);
+          ctx.scale(-1, 1);
+          ctx.drawImage(sprite.image, sprite.sx, sprite.sy, sprite.sw, sprite.sh, 0, 0, size, size);
+          ctx.restore();
+        } else {
+          ctx.drawImage(
+            sprite.image,
+            sprite.sx,
+            sprite.sy,
+            sprite.sw,
+            sprite.sh,
+            drawX,
+            drawY,
+            size,
+            size,
+          );
+        }
+      } else if (sprite) {
+        const sourceSize = enemy.spriteSet?.sourceSize ?? size;
+        ctx.drawImage(sprite, 0, 0, sourceSize, sourceSize, screen.x - halfSize, screen.y - halfSize, size, size);
       }
 
       if (enemy.hitFlashTime > 0) {
         const flashStrength = clamp(enemy.hitFlashTime / GameConfig.enemies.hitFlashTime, 0, 1);
-        this.context.save();
-        this.context.fillStyle = `rgba(255, 255, 255, ${0.22 + flashStrength * 0.42})`;
-        this.context.beginPath();
-        this.context.arc(screenPosition.x, screenPosition.y, enemy.collisionRadius + 10 + flashStrength * 6, 0, Math.PI * 2);
-        this.context.fill();
-        this.context.strokeStyle = `rgba(255, 244, 220, ${0.25 + flashStrength * 0.35})`;
-        this.context.lineWidth = 2 + flashStrength * 2;
-        this.context.stroke();
-        this.context.restore();
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.22 + flashStrength * 0.42})`;
+        ctx.beginPath();
+        ctx.arc(
+          screen.x,
+          screen.y,
+          enemy.collisionRadius + 10 + flashStrength * 6,
+          0,
+          Math.PI * 2,
+        );
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255, 244, 220, ${0.25 + flashStrength * 0.35})`;
+        ctx.lineWidth = 2 + flashStrength * 2;
+        ctx.stroke();
       }
     }
+
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = "#17243a";
+    for (const enemy of enemies) {
+      if (enemy.isDead || enemy.isBoss || enemy.health >= enemy.maxHealth) {
+        continue;
+      }
+
+      screen.x = enemy.position.x - camera.position.x;
+      screen.y = enemy.position.y - camera.position.y;
+
+      if (
+        screen.x < -margin ||
+        screen.x > camera.width + margin ||
+        screen.y < -margin ||
+        screen.y > camera.height + margin
+      ) {
+        continue;
+      }
+
+      const halfSize = enemy.renderSize / 2;
+      const barX = screen.x - 38;
+      const barY = screen.y - halfSize - 18;
+      const barWidth = 76;
+      const barHeight = 7;
+      const percent = clamp(enemy.health / enemy.maxHealth, 0, 1);
+
+      ctx.fillRect(barX, barY, barWidth, barHeight);
+      ctx.fillStyle = getEnemyHealthColor(enemy.type);
+      ctx.fillRect(barX, barY, barWidth * percent, barHeight);
+      ctx.fillStyle = "#17243a";
+    }
+    ctx.restore();
   }
 
   drawWeaponEffects(weaponSystem, player, camera) {
@@ -471,13 +575,31 @@ export class Renderer {
 
 function getEnemyHealthColor(type) {
   const colors = {
-    slime: "#9b7dff",
+    slime: "#68a850",
+    zombie: "#7a9a68",
+    brainZombie: "#b86868",
+    vikingUndead: "#8898a8",
+    skeletonUndead: "#d0d4dc",
+    popstarUndead: "#e868a8",
+    knightUndead: "#788898",
+    greenDragon: "#58a848",
+    polarDogBoss: "#d8e4f0",
+    spottedDogBoss: "#d0a858",
+    reaperBoss: "#686878",
     bat: "#d8c4a0",
     brute: "#8a6858",
     crawler: "#8a78c8",
     elite: "#ffc86a",
     boss: "#ff6a58",
+    wolfPouncer: "#9ec4e8",
+    skeletonArcher: "#c8d0d8",
+    shieldBrute: "#788898",
+    goblinRunner: "#78a858",
+    necromancer: "#a868c8",
+    fireImp: "#ff7848",
+    iceWraith: "#88d8ff",
+    castleKnight: "#b8a878",
   };
 
-  return colors[type] ?? "#9b7dff";
+  return colors[type] ?? "#68a850";
 }

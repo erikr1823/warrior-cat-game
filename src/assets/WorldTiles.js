@@ -42,8 +42,120 @@ export const TILE_PALETTES = {
     moss: { bases: ["#3a2e24", "#342820", "#2e241c"], highlights: ["#524036", "#4a382e", "#443428"], moss: "rgba(62, 54, 88, 0.45)" },
     stroke: "rgba(48, 44, 72, 0.22)",
     edge: "rgba(22, 20, 36, 0.1)",
+    tileWeights: { moss: 0.14, stone: 0.28, grass: 0.58 },
+  },
+  castleCourtyard: {
+    grass: { bases: ["#6a5e48", "#645842", "#5e543c"], accent: ["#8a7858", "#907e60", "#7a6a50"] },
+    stone: { bases: ["#8a8070", "#807668", "#767060"], highlights: ["#a8a090", "#9e9688", "#948c80"] },
+    moss: { bases: ["#7a7058", "#746a52", "#6e644c"], highlights: ["#948870", "#8a8068", "#807860"], moss: "rgba(88, 98, 48, 0.28)" },
+    stroke: "rgba(48, 40, 28, 0.2)",
+    edge: "rgba(32, 26, 18, 0.1)",
+    tileWeights: { moss: 0.05, stone: 0.55, grass: 0.4 },
+  },
+  moonlitForest: {
+    grass: { bases: ["#1a3028", "#183028", "#162c26"], accent: ["#284838", "#305040", "#244034"] },
+    stone: { bases: ["#243038", "#202c34", "#1c2830"], highlights: ["#3a4850", "#344248", "#303c44"] },
+    moss: { bases: ["#1e3428", "#1a3024", "#182c22"], highlights: ["#345040", "#304838", "#2c4434"], moss: "rgba(72, 120, 88, 0.5)" },
+    stroke: "rgba(20, 36, 32, 0.22)",
+    edge: "rgba(10, 18, 16, 0.12)",
+    tileWeights: { moss: 0.22, stone: 0.12, grass: 0.66 },
+  },
+  ancientCrypt: {
+    grass: { bases: ["#342838", "#302434", "#2c2030"], accent: ["#443848", "#4a3e50", "#403442"] },
+    stone: { bases: ["#484058", "#423a52", "#3c364c"], highlights: ["#625870", "#5c5268", "#564c62"] },
+    moss: { bases: ["#403848", "#3a3442", "#34303c"], highlights: ["#5a5068", "#544a60", "#4e465a"], moss: "rgba(68, 58, 92, 0.35)" },
+    stroke: "rgba(32, 24, 44, 0.24)",
+    edge: "rgba(14, 10, 20, 0.12)",
+    tileWeights: { moss: 0.08, stone: 0.62, grass: 0.3 },
+  },
+  snowyPass: {
+    grass: { bases: ["#d8e4f0", "#d0dce8", "#c8d4e0"], accent: ["#eef4fa", "#e8eef6", "#e0e8f2"] },
+    stone: { bases: ["#a8b8c8", "#9eb0c0", "#94a8b8"], highlights: ["#c8d8e8", "#becede", "#b4c4d4"] },
+    moss: { bases: ["#b0c0d0", "#a6b6c6", "#9cacc0"], highlights: ["#d0e0f0", "#c6d6e6", "#bccce0"], moss: "rgba(180, 210, 240, 0.35)" },
+    stroke: "rgba(120, 140, 168, 0.18)",
+    edge: "rgba(200, 220, 240, 0.14)",
+    tileWeights: { moss: 0.1, stone: 0.48, grass: 0.42 },
+  },
+  lavaForge: {
+    grass: { bases: ["#281814", "#241410", "#20100c"], accent: ["#402820", "#483020", "#382018"] },
+    stone: { bases: ["#342018", "#301c14", "#2c1810"], highlights: ["#503028", "#4a2c24", "#442820"] },
+    moss: { bases: ["#301810", "#2c140c", "#281008"], highlights: ["#4a3020", "#442c1c", "#3e2818"], moss: "rgba(180, 64, 24, 0.32)" },
+    stroke: "rgba(48, 20, 8, 0.26)",
+    edge: "rgba(18, 8, 4, 0.14)",
+    tileWeights: { moss: 0.12, stone: 0.68, grass: 0.2 },
+  },
+  royalArchive: {
+    grass: { bases: ["#4a3424", "#463020", "#422c1c"], accent: ["#624838", "#684e3e", "#5a4030"] },
+    stone: { bases: ["#6a5040", "#644a38", "#5e4434"], highlights: ["#886858", "#806050", "#785848"] },
+    moss: { bases: ["#5a4030", "#543a2c", "#4e3428"], highlights: ["#785840", "#705038", "#684830"], moss: "rgba(120, 88, 40, 0.3)" },
+    stroke: "rgba(36, 24, 12, 0.22)",
+    edge: "rgba(20, 12, 6, 0.1)",
+    tileWeights: { moss: 0.06, stone: 0.44, grass: 0.5 },
+  },
+  plagueVault: {
+    grass: { bases: ["#2a3828", "#263424", "#223020"], accent: ["#3a4838", "#405040", "#364430"] },
+    stone: { bases: ["#384438", "#343e34", "#303830"], highlights: ["#525c52", "#4c564c", "#465046"] },
+    moss: { bases: ["#344028", "#303c24", "#2c3820"], highlights: ["#4c5840", "#465238", "#404c34"], moss: "rgba(72, 120, 64, 0.45)" },
+    stroke: "rgba(24, 36, 20, 0.24)",
+    edge: "rgba(12, 18, 10, 0.12)",
+    tileWeights: { moss: 0.18, stone: 0.52, grass: 0.3 },
+  },
+  frostBarrow: {
+    grass: { bases: ["#3a4858", "#364450", "#32404c"], accent: ["#506070", "#566878", "#4a5c6c"] },
+    stone: { bases: ["#586878", "#526272", "#4c5c6c"], highlights: ["#788898", "#728292", "#6c7c8c"] },
+    moss: { bases: ["#4a5868", "#445262", "#404c5c"], highlights: ["#687888", "#627282", "#5c6c7c"], moss: "rgba(140, 180, 210, 0.35)" },
+    stroke: "rgba(32, 44, 56, 0.22)",
+    edge: "rgba(16, 22, 32, 0.12)",
+    tileWeights: { moss: 0.14, stone: 0.58, grass: 0.28 },
+  },
+  boneCrypt: {
+    grass: { bases: ["#3a3840", "#36343c", "#323038"], accent: ["#504e58", "#565460", "#4a4850"] },
+    stone: { bases: ["#585660", "#525058", "#4c4a54"], highlights: ["#787680", "#727078", "#6c6a74"] },
+    moss: { bases: ["#4a4850", "#44444c", "#404048"], highlights: ["#686670", "#626068", "#5c5a64"], moss: "rgba(160, 160, 170, 0.3)" },
+    stroke: "rgba(36, 34, 44, 0.22)",
+    edge: "rgba(18, 16, 24, 0.12)",
+    tileWeights: { moss: 0.1, stone: 0.64, grass: 0.26 },
+  },
+  fallenParade: {
+    grass: { bases: ["#3a2838", "#362434", "#322030"], accent: ["#503848", "#563e50", "#4a3444"] },
+    stone: { bases: ["#584058", "#523a52", "#4c344c"], highlights: ["#785870", "#725068", "#6c4860"] },
+    moss: { bases: ["#4a3448", "#443044", "#402c40"], highlights: ["#685060", "#624858", "#5c4450"], moss: "rgba(160, 96, 140, 0.32)" },
+    stroke: "rgba(36, 20, 32, 0.22)",
+    edge: "rgba(18, 10, 16, 0.12)",
+    tileWeights: { moss: 0.12, stone: 0.52, grass: 0.36 },
+  },
+  cursedRuins: {
+    grass: { bases: ["#283020", "#242c1c", "#202818"], accent: ["#384830", "#405038", "#344428"] },
+    stone: { bases: ["#3a4030", "#363a2c", "#323428"], highlights: ["#525840", "#4c5238", "#464c34"] },
+    moss: { bases: ["#344028", "#303c24", "#2c3820"], highlights: ["#4c5840", "#465238", "#404c34"], moss: "rgba(48, 88, 32, 0.55)" },
+    stroke: "rgba(24, 32, 18, 0.24)",
+    edge: "rgba(12, 16, 8, 0.12)",
+    tileWeights: { moss: 0.28, stone: 0.34, grass: 0.38 },
+  },
+  summerForest: {
+    grass: { bases: ["#4a7838", "#467034", "#426830"], accent: ["#68a048", "#70a850", "#5c9840"] },
+    stone: { bases: ["#6a6048", "#645a44", "#5e543c"], highlights: ["#847860", "#7c7058", "#746850"] },
+    moss: { bases: ["#527840", "#4c7038", "#466834"], highlights: ["#6a9850", "#629048", "#5a8840"], moss: "rgba(72, 120, 48, 0.42)" },
+    stroke: "rgba(32, 48, 24, 0.2)",
+    edge: "rgba(18, 28, 12, 0.1)",
+    tileWeights: { moss: 0.18, stone: 0.1, grass: 0.72 },
+  },
+  graveyard: {
+    grass: { bases: ["#343840", "#30343c", "#2c3038"], accent: ["#444c58", "#4a5460", "#404850"] },
+    stone: { bases: ["#505860", "#4a5058", "#444850"], highlights: ["#686e78", "#626870", "#5c6268"] },
+    moss: { bases: ["#3a4048", "#363a42", "#32363e"], highlights: ["#525860", "#4c5258", "#464c54"], moss: "rgba(72, 88, 108, 0.38)" },
+    stroke: "rgba(28, 32, 40, 0.22)",
+    edge: "rgba(14, 16, 22, 0.12)",
+    tileWeights: { moss: 0.14, stone: 0.46, grass: 0.4 },
   },
 };
+
+const DEFAULT_TILE_WEIGHTS = { moss: 0.12, stone: 0.22, grass: 0.66 };
+
+export function getTileWeights(paletteId) {
+  const palette = TILE_PALETTES[paletteId] ?? TILE_PALETTES.unwritten;
+  return palette.tileWeights ?? DEFAULT_TILE_WEIGHTS;
+}
 
 function mulberry32(seed) {
   let value = seed >>> 0;

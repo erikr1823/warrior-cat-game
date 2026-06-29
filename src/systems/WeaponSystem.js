@@ -1,4 +1,4 @@
-import { circlesOverlap, directionBetween, distanceBetween } from "../core/MathUtils.js";
+import { circlesOverlap, directionBetween, distanceBetween, normalizeVector } from "../core/MathUtils.js";
 import { GameConfig } from "../config/GameConfig.js";
 import {
   STARTER_WEAPON_ID,
@@ -13,6 +13,9 @@ export class WeaponSystem {
   constructor() {
     this.weapons = new Map();
     this.visualEffects = [];
+    this.bladeScratch = [];
+    this.enemyScratch = [];
+    this.manualShotCooldown = 0;
     this.behaviors = {
       arcaneBolt: (weapon, deltaTime, game) => this.updateArcaneBolt(weapon, game),
       orbitingBlade: (weapon, deltaTime, game) => this.updateOrbitingBlade(weapon, deltaTime, game),
@@ -24,6 +27,7 @@ export class WeaponSystem {
   }
 
   update(deltaTime, game) {
+    this.manualShotCooldown = Math.max(0, this.manualShotCooldown - deltaTime);
     this.updateVisualEffects(deltaTime);
 
     for (const weapon of this.weapons.values()) {
@@ -37,6 +41,45 @@ export class WeaponSystem {
     for (const weapon of this.weapons.values()) {
       weapon.timer = 0;
     }
+  }
+
+  fireManualInkFlick(game, direction) {
+    if (this.manualShotCooldown > 0) {
+      return false;
+    }
+
+    const shotConfig = GameConfig.player.manualShot;
+    const aimDirection = normalizeVector(direction);
+
+    if (aimDirection.x === 0 && aimDirection.y === 0) {
+      return false;
+    }
+
+    this.manualShotCooldown = shotConfig.cooldown;
+    game.feedback.onShoot();
+
+    game.projectiles.push(
+      game.projectilePool.acquire(game.player.position.x, game.player.position.y, aimDirection, {
+        damage: shotConfig.damage,
+        speed: shotConfig.speed,
+        radius: shotConfig.radius,
+        maxDistance: shotConfig.maxDistance,
+        pierce: 0,
+        visualStyle: "arcane",
+      }),
+    );
+
+    return true;
+  }
+
+  getManualShotCooldownProgress() {
+    const cooldown = GameConfig.player.manualShot.cooldown;
+
+    if (this.manualShotCooldown <= 0) {
+      return 1;
+    }
+
+    return 1 - this.manualShotCooldown / cooldown;
   }
 
   addWeapon(id) {
@@ -245,31 +288,35 @@ export class WeaponSystem {
   updateOrbitingBlade(weapon, deltaTime, game) {
     weapon.angle += weapon.orbitSpeed * deltaTime;
     const blades = this.getOrbitingBladePositions(weapon, game.player.position);
+    const grid = game.collisionSystem?.enemyGrid;
 
-    for (const enemy of game.enemies) {
+    for (const [enemy, timer] of weapon.hitTimers) {
       if (enemy.isDead) {
+        weapon.hitTimers.delete(enemy);
         continue;
       }
 
-      const currentTimer = weapon.hitTimers.get(enemy) ?? 0;
-
-      if (currentTimer > 0) {
-        weapon.hitTimers.set(enemy, currentTimer - deltaTime);
-        continue;
-      }
-
-      for (const blade of blades) {
-        if (circlesOverlap(blade, enemy)) {
-          damageEnemy(game, enemy, weapon.damage, directionBetween(game.player.position, enemy.position));
-          weapon.hitTimers.set(enemy, weapon.hitCooldown);
-          break;
-        }
+      if (timer > 0) {
+        weapon.hitTimers.set(enemy, timer - deltaTime);
       }
     }
 
-    for (const enemy of [...weapon.hitTimers.keys()]) {
-      if (enemy.isDead) {
-        weapon.hitTimers.delete(enemy);
+    for (const blade of blades) {
+      const nearby = grid
+        ? grid.query(blade.position, blade.radius + 72, this.enemyScratch)
+        : game.enemies;
+
+      for (const enemy of nearby) {
+        if (enemy.isDead || (weapon.hitTimers.get(enemy) ?? 0) > 0) {
+          continue;
+        }
+
+        if (!circlesOverlap(blade, enemy)) {
+          continue;
+        }
+
+        damageEnemy(game, enemy, weapon.damage, directionBetween(game.player.position, enemy.position));
+        weapon.hitTimers.set(enemy, weapon.hitCooldown);
       }
     }
   }
@@ -315,9 +362,14 @@ export class WeaponSystem {
       return;
     }
 
-    const onScreenEnemies = game.enemies.filter(
-      (enemy) => !enemy.isDead && isOnScreen(enemy, game.camera, game.width, game.height),
-    );
+    const onScreenEnemies = this.enemyScratch;
+    onScreenEnemies.length = 0;
+
+    for (const enemy of game.enemies) {
+      if (!enemy.isDead && isOnScreen(enemy, game.camera, game.width, game.height)) {
+        onScreenEnemies.push(enemy);
+      }
+    }
 
     if (onScreenEnemies.length === 0) {
       return;
@@ -380,15 +432,23 @@ export class WeaponSystem {
   }
 
   updateVisualEffects(deltaTime) {
+    let writeIndex = 0;
+
     for (const effect of this.visualEffects) {
       effect.life -= deltaTime;
+
+      if (effect.life > 0) {
+        this.visualEffects[writeIndex] = effect;
+        writeIndex += 1;
+      }
     }
 
-    this.visualEffects = this.visualEffects.filter((effect) => effect.life > 0);
+    this.visualEffects.length = writeIndex;
   }
 
   getOrbitingBladePositions(weapon, playerPosition) {
-    const blades = [];
+    const blades = this.bladeScratch;
+    blades.length = 0;
 
     for (let index = 0; index < weapon.bladeCount; index += 1) {
       const angle = weapon.angle + (Math.PI * 2 * index) / weapon.bladeCount;

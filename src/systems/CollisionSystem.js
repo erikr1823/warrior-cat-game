@@ -1,11 +1,15 @@
 import { circlesOverlap } from "../core/MathUtils.js";
+import { SpatialGrid } from "../core/SpatialGrid.js";
 import { GameConfig } from "../config/GameConfig.js";
+import { isGodMode } from "../debug/GodMode.js";
 import { damageEnemy } from "./EnemyDamage.js";
 
 export class CollisionSystem {
   constructor() {
     this.playerBumpCooldown = 0;
     this.playerBumpCooldownDuration = 0.32;
+    this.enemyGrid = new SpatialGrid(256);
+    this.nearbyEnemies = [];
   }
 
   update(deltaTime, game) {
@@ -15,13 +19,30 @@ export class CollisionSystem {
     this.handleChestCollisions(game);
   }
 
+  prepareFrame(enemies) {
+    this.rebuildEnemyGrid(enemies);
+  }
+
+  rebuildEnemyGrid(enemies) {
+    this.enemyGrid.clear();
+
+    for (const enemy of enemies) {
+      if (!enemy.isDead) {
+        this.enemyGrid.insert(enemy);
+      }
+    }
+  }
+
   handleProjectileEnemyCollisions(game) {
     for (const projectile of game.projectiles) {
       if (projectile.isDead) {
         continue;
       }
 
-      for (const enemy of game.enemies) {
+      const searchRadius = projectile.radius + 96;
+      const nearby = this.enemyGrid.query(projectile.position, searchRadius, this.nearbyEnemies);
+
+      for (const enemy of nearby) {
         if (enemy.isDead || projectile.hitEnemies.has(enemy)) {
           continue;
         }
@@ -44,11 +65,14 @@ export class CollisionSystem {
   }
 
   handlePlayerEnemyCollisions(game) {
-    if (this.playerBumpCooldown > 0 || game.player.isDead) {
+    if (this.playerBumpCooldown > 0 || game.player.isDead || isGodMode(game)) {
       return;
     }
 
-    for (const enemy of game.enemies) {
+    const searchRadius = game.player.radius + 96;
+    const nearby = this.enemyGrid.query(game.player.position, searchRadius, this.nearbyEnemies);
+
+    for (const enemy of nearby) {
       if (enemy.isDead) {
         continue;
       }

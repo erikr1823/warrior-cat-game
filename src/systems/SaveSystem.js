@@ -21,6 +21,7 @@ export function createDefaultSaveData() {
     metaUpgrades: createDefaultMetaUpgrades(),
     settings: {
       muted: false,
+      volume: 1,
     },
   };
 }
@@ -68,6 +69,15 @@ function normalizeSaveData(saveData) {
       ...defaults.settings,
       ...(saveData?.settings ?? {}),
       muted: Boolean(saveData?.settings?.muted),
+      volume: normalizeVolume(saveData?.settings?.volume),
     },
   };
+}
+
+function normalizeVolume(value) {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+
+  return Math.max(0, Math.min(1, value));
 }

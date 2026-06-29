@@ -8,6 +8,7 @@
     "start:none": "npx --yes serve -l 8765 .",
     "setup:characters": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-characters.ps1",
     "setup:enemies": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/import-enemy-packs.ps1",
-    "setup:music": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-music.ps1"
+    "setup:music": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-music.ps1",
+    "setup:assets": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-imported-assets.ps1"
   }
 }

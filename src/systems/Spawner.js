@@ -37,7 +37,7 @@ export class Spawner {
       return;
     }
 
-    this.spawnTimer = this.waveDirector.getSpawnInterval(game.survivalTime);
+    this.spawnTimer = this.waveDirector.getSpawnInterval(game.survivalTime, game.bossDefeatedCount);
     this.spawnEnemy(game);
   }
 
@@ -46,7 +46,10 @@ export class Spawner {
     const wave = getWaveForTime(game.survivalTime);
     const world = getWorldForWave(wave);
     const type = this.waveDirector.pickEnemyType(game.survivalTime);
-    const healthMultiplier = this.waveDirector.getHealthMultiplier(game.survivalTime);
+    const healthMultiplier = this.waveDirector.getHealthMultiplier(
+      game.survivalTime,
+      game.bossDefeatedCount,
+    );
     const speedMultiplier = this.waveDirector.getSpeedMultiplier(game.survivalTime);
 
     game.enemies.push(

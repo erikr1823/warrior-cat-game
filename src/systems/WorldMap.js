@@ -1,13 +1,15 @@
 import { GameConfig } from "../config/GameConfig.js";
 import { EverRogueTileset } from "../assets/EverRogueTileset.js";
+import { drawBiomeDecoration } from "../assets/BiomeDecorations.js";
 import {
   createWorldTileSet,
   getTileSize,
+  getTileWeights,
   hashTile,
   mulberry32,
 } from "../assets/WorldTiles.js";
 
-const DECORATION_TYPES = ["rock", "bone", "grassPatch", "candle", "ruin"];
+const DEFAULT_DECORATION_TYPES = ["rock", "bone", "grassPatch", "candle", "ruin"];
 
 export class WorldMap {
   constructor(config = GameConfig.world) {
@@ -19,7 +21,34 @@ export class WorldMap {
     this.usePixelTileset = config.useEverRogueTileset ?? true;
     this.tileset = new EverRogueTileset();
     this.tileSets = {};
-    this.activeTilePalette = "unwritten";
+    this.activeTilePalette = "castleCourtyard";
+    this.activeWorldId = "castleCourtyard";
+    this.activeDecorationTypes = DEFAULT_DECORATION_TYPES;
+    this.activeDecorationKey = DEFAULT_DECORATION_TYPES.join("|");
+    this.activeTileWeights = getTileWeights(this.activeTilePalette);
+  }
+
+  applyWorld(world) {
+    const paletteId = world?.tilePalette ?? this.activeTilePalette;
+    const worldId = world?.id ?? this.activeWorldId;
+    const decorationTypes =
+      world?.decorationTypes?.length > 0 ? world.decorationTypes : DEFAULT_DECORATION_TYPES;
+    const decorationKey = decorationTypes.join("|");
+
+    if (
+      worldId === this.activeWorldId &&
+      paletteId === this.activeTilePalette &&
+      decorationKey === this.activeDecorationKey
+    ) {
+      return;
+    }
+
+    this.setTilePalette(paletteId);
+    this.activeWorldId = worldId;
+    this.activeDecorationTypes = decorationTypes;
+    this.activeDecorationKey = decorationKey;
+    this.activeTileWeights = getTileWeights(paletteId);
+    this.decorationCache.clear();
   }
 
   setTilePalette(paletteId) {
@@ -70,12 +99,13 @@ export class WorldMap {
     const hash = hashTile(tileX, tileY);
     const rand = mulberry32(hash);
     const roll = rand();
+    const weights = this.activeTileWeights;
 
-    if (roll < 0.12) {
+    if (roll < weights.moss) {
       return tiles.mossStoneTiles[this.modIndex(hash, tiles.mossStoneTiles.length)];
     }
 
-    if (roll < 0.34) {
+    if (roll < weights.moss + weights.stone) {
       return tiles.stoneTiles[this.modIndex(hash, tiles.stoneTiles.length)];
     }
 
@@ -129,7 +159,7 @@ export class WorldMap {
   }
 
   getChunkDecorations(chunkX, chunkY) {
-    const key = `${chunkX},${chunkY}`;
+    const key = `${this.activeWorldId}:${chunkX},${chunkY}`;
 
     if (this.decorationCache.has(key)) {
       return this.decorationCache.get(key);
@@ -158,7 +188,8 @@ export class WorldMap {
         continue;
       }
 
-      const type = DECORATION_TYPES[Math.floor(rand() * DECORATION_TYPES.length)];
+      const type =
+        this.activeDecorationTypes[Math.floor(rand() * this.activeDecorationTypes.length)];
       decorations.push({
         type,
         x: chunkWorldX + rand() * this.chunkSize,
@@ -212,19 +243,7 @@ export class WorldMap {
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(scale, scale);
-
-    if (decoration.type === "rock") {
-      drawRock(ctx, decoration.variant);
-    } else if (decoration.type === "bone") {
-      drawBone(ctx, decoration.variant);
-    } else if (decoration.type === "grassPatch") {
-      drawGrassPatch(ctx, decoration.variant);
-    } else if (decoration.type === "candle") {
-      drawCandle(ctx, decoration.variant);
-    } else if (decoration.type === "ruin") {
-      drawRuin(ctx, decoration.variant);
-    }
-
+    drawBiomeDecoration(ctx, decoration.type, decoration.variant);
     ctx.restore();
   }
 
@@ -248,85 +267,4 @@ export class WorldMap {
     ctx.fillStyle = `rgba(8, 10, 14, ${alpha})`;
     ctx.fillRect(0, 0, camera.width, camera.height);
   }
-}
-
-function drawRock(ctx, variant) {
-  const shade = variant % 2 === 0 ? "#5f666f" : "#545b64";
-  ctx.fillStyle = "rgba(10, 12, 16, 0.25)";
-  ctx.beginPath();
-  ctx.ellipse(2, 10, 16, 7, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = shade;
-  ctx.beginPath();
-  ctx.moveTo(-14, 8);
-  ctx.lineTo(-8, -10);
-  ctx.lineTo(6, -12);
-  ctx.lineTo(16, 0);
-  ctx.lineTo(10, 10);
-  ctx.closePath();
-  ctx.fill();
-}
-
-function drawBone(ctx, variant) {
-  ctx.strokeStyle = "#d8cbb8";
-  ctx.lineWidth = 4;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(-14, variant % 2 === 0 ? 4 : -2);
-  ctx.lineTo(14, variant % 2 === 0 ? -4 : 2);
-  ctx.stroke();
-
-  ctx.fillStyle = "#ece2d0";
-  ctx.beginPath();
-  ctx.arc(-14, variant % 2 === 0 ? 4 : -2, 5, 0, Math.PI * 2);
-  ctx.arc(14, variant % 2 === 0 ? -4 : 2, 5, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawGrassPatch(ctx, variant) {
-  const count = 4 + (variant % 3);
-
-  for (let i = 0; i < count; i += 1) {
-    const x = -10 + i * 5;
-    const height = 10 + ((variant + i) % 4) * 2;
-    ctx.strokeStyle = i % 2 === 0 ? "#56784f" : "#6a8d61";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x, 8);
-    ctx.quadraticCurveTo(x + (i % 2 === 0 ? 2 : -2), -height / 2, x + (i % 2), -height);
-    ctx.stroke();
-  }
-}
-
-function drawCandle(ctx, variant) {
-  ctx.fillStyle = "rgba(10, 12, 16, 0.22)";
-  ctx.beginPath();
-  ctx.ellipse(0, 12, 8, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = "#c8b090";
-  ctx.fillRect(-3, -2, 6, 14);
-
-  ctx.fillStyle = variant % 2 === 0 ? "#ffd27e" : "#ffb86a";
-  ctx.beginPath();
-  ctx.moveTo(0, -8);
-  ctx.quadraticCurveTo(4, -14, 0, -18);
-  ctx.quadraticCurveTo(-4, -14, 0, -8);
-  ctx.fill();
-}
-
-function drawRuin(ctx, variant) {
-  ctx.fillStyle = "#4f555e";
-  ctx.fillRect(-16, 0, 10, 12);
-  ctx.fillRect(-2, -4, 14, 16);
-  ctx.fillStyle = "#686f78";
-  ctx.fillRect(10, 4, 8, 8);
-
-  ctx.strokeStyle = "rgba(18, 20, 24, 0.35)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(-16, 0);
-  ctx.lineTo(18, -4);
-  ctx.stroke();
 }

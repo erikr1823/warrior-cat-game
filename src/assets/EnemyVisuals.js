@@ -1,6 +1,9 @@
 import { GameConfig } from "../config/GameConfig.js";
 import {
+  ENEMY_TYPES,
+  IMPORTED_ENEMY_SHEETS,
   getEnemyArtPack,
+  getImportedEnemySheet,
   getEnemySheetMeta,
   getEnemySheetPath,
   getEnemySpritePath,
@@ -14,12 +17,27 @@ function cacheKey(packId, enemyType) {
   return `${packId}:${enemyType}`;
 }
 
-function loadImage(src) {
+const SLIME_ART_PACK = "tinyMonsters";
+
+function getArtPackForEnemy(enemyType, worldPackId) {
+  if (enemyType === "slime") {
+    return SLIME_ART_PACK;
+  }
+
+  return worldPackId;
+}
+
+function loadImage(src, onReady) {
   if (imageCache.has(src)) {
     return imageCache.get(src);
   }
 
   const image = new Image();
+  image.onload = () => {
+    if (onReady) {
+      onReady();
+    }
+  };
   image.src = src;
   imageCache.set(src, image);
   return image;
@@ -84,6 +102,10 @@ function buildImageSet(enemyType, packId, image) {
 }
 
 function buildSheetSet(packId, sheet, meta) {
+  if (meta.directionRows) {
+    return buildDirectionalSheetSet(packId, sheet, meta);
+  }
+
   const pack = getEnemyArtPack(packId);
   const frameWidth = meta.frameWidth ?? pack.sourceSize;
   const frameHeight = meta.frameHeight ?? pack.sourceSize;
@@ -110,7 +132,53 @@ function buildSheetSet(packId, sheet, meta) {
   };
 }
 
+function buildDirectionalSheetSet(packId, sheet, meta) {
+  const pack = getEnemyArtPack(packId);
+  const frameWidth = meta.frameWidth ?? pack.sourceSize;
+  const frameHeight = meta.frameHeight ?? pack.sourceSize;
+  const directions = {};
+  let maxFrameCount = 1;
+
+  for (const [facing, row] of Object.entries(meta.directionRows)) {
+    const frameCount = meta.directionFrameCounts?.[facing] ?? meta.frameCount ?? 4;
+    const frames = [];
+
+    for (let index = 0; index < frameCount; index += 1) {
+      frames.push({
+        image: sheet,
+        sx: index * frameWidth,
+        sy: row * frameHeight,
+        sw: frameWidth,
+        sh: frameHeight,
+        flipHorizontal: meta.flipDirections?.[facing] ?? false,
+      });
+    }
+
+    directions[facing] = frames;
+    maxFrameCount = Math.max(maxFrameCount, frameCount);
+  }
+
+  return {
+    frameCount: maxFrameCount,
+    sourceSize: Math.max(frameWidth, frameHeight),
+    usesSheet: true,
+    directional: true,
+    directions,
+    frames: directions.down ?? directions[Object.keys(directions)[0]],
+  };
+}
+
 function resolveImageSet(enemyType, packId) {
+  const imported = getImportedEnemySheet(enemyType);
+
+  if (imported) {
+    const sheet = loadImage(imported.path, refreshEnemyVisualCache);
+
+    if (imageReady(sheet)) {
+      return buildSheetSet(packId, sheet, imported);
+    }
+  }
+
   const sheetMeta = getEnemySheetMeta(packId, enemyType);
   const sheetSrc = getEnemySheetPath(packId, enemyType);
   const sheet = loadImage(sheetSrc);
@@ -138,8 +206,12 @@ function isProceduralSet(visualSet) {
 }
 
 export function preloadEnemyArt() {
+  for (const imported of Object.values(IMPORTED_ENEMY_SHEETS)) {
+    loadImage(imported.path, refreshEnemyVisualCache);
+  }
+
   for (const packId of ["pixelCrawler", "tinyMonsters", "darkFantasy", "cursedSpirits"]) {
-    for (const enemyType of ["slime", "bat", "brute", "crawler", "elite", "boss"]) {
+    for (const enemyType of ENEMY_TYPES) {
       loadImage(getEnemySheetPath(packId, enemyType));
       loadImage(getEnemySpritePath(packId, enemyType));
     }
@@ -147,26 +219,34 @@ export function preloadEnemyArt() {
 }
 
 export function getEnemyVisualSet(enemyType, packId = "ink") {
-  const key = cacheKey(packId, enemyType);
+  const artPack = getArtPackForEnemy(enemyType, packId);
+  const key = cacheKey(artPack, enemyType);
   const cached = frameCache.get(key);
 
   if (cached && !isProceduralSet(cached)) {
     return cached;
   }
 
-  const resolved = resolveImageSet(enemyType, packId);
+  const resolved = resolveImageSet(enemyType, artPack);
   frameCache.set(key, resolved);
   return resolved;
 }
 
 export function getEnemyRenderSize(enemyType, packId) {
+  const imported = getImportedEnemySheet(enemyType);
+
+  if (imported) {
+    return Math.round(imported.sourceSize * imported.renderScale);
+  }
+
+  const artPack = getArtPackForEnemy(enemyType, packId);
   const config = GameConfig.enemies[enemyType] ?? GameConfig.enemies.slime;
 
-  if (packId === "ink") {
+  if (artPack === "ink") {
     return config.renderSize;
   }
 
-  const pack = getEnemyArtPack(packId);
+  const pack = getEnemyArtPack(artPack);
   const visualSet = getEnemyVisualSet(enemyType, packId);
 
   return Math.round(visualSet.sourceSize * pack.renderScale);

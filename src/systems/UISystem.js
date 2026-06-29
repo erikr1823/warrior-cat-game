@@ -19,10 +19,17 @@ export class UISystem {
     };
     this.muteButton = {
       x: width - 92,
-      y: 28,
+      y: height - 72,
       width: 60,
       height: 44,
     };
+    this.volumeSlider = {
+      x: width - 410,
+      y: height - 72,
+      width: 230,
+      height: 44,
+    };
+    this.volumeDragging = false;
   }
 
   draw({
@@ -43,7 +50,10 @@ export class UISystem {
     wave = null,
     waveAnnouncement = null,
     muted = false,
+    volume = 1,
     lowHealthPulse = 0,
+    dashCooldownProgress = 1,
+    manualShotCooldownProgress = 1,
     projectileCount = 0,
     particleCount = 0,
     pickupCount = 0,
@@ -79,10 +89,11 @@ export class UISystem {
     this.drawWaveInfo(wave);
     this.drawWaveAnnouncement(waveAnnouncement);
     this.drawXPBar(playerLevel, playerXP, playerXPToNextLevel);
+    this.drawAbilityCooldowns(dashCooldownProgress, manualShotCooldownProgress);
     if (showPauseButton) {
       this.drawPauseButton();
     }
-    this.drawMuteButton(muted);
+    this.drawAudioControls(muted, volume);
     this.drawPerfStats({
       fps,
       enemyCount,
@@ -138,11 +149,97 @@ export class UISystem {
   }
 
   consumePauseClick(input) {
-    if (!input.isMouseOver(this.pauseButton)) {
-      return false;
+    return input.consumeUiClick(this.pauseButton);
+  }
+
+  drawAudioControls(muted, volume) {
+    this.drawVolumeSlider(volume);
+    this.drawMuteButton(muted);
+  }
+
+  getVolumeTrackBounds() {
+    const slider = this.volumeSlider;
+
+    return {
+      left: slider.x + 46,
+      right: slider.x + slider.width - 14,
+      centerY: slider.y + slider.height / 2,
+    };
+  }
+
+  volumeFromX(x) {
+    const track = this.getVolumeTrackBounds();
+    const span = track.right - track.left;
+
+    if (span <= 0) {
+      return 0;
     }
 
-    return input.consumeClick();
+    return clamp((x - track.left) / span, 0, 1);
+  }
+
+  drawVolumeSlider(volume) {
+    const ctx = this.context;
+    const slider = this.volumeSlider;
+    const track = this.getVolumeTrackBounds();
+    const level = clamp(volume, 0, 1);
+
+    ctx.fillStyle = "rgba(10, 14, 18, 0.58)";
+    ctx.fillRect(slider.x, slider.y, slider.width, slider.height);
+    ctx.strokeStyle = "rgba(255, 222, 161, 0.32)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(slider.x, slider.y, slider.width, slider.height);
+
+    ctx.fillStyle = "#fff4dc";
+    ctx.font = "600 18px system-ui, sans-serif";
+    ctx.fillText("VOL", slider.x + 12, slider.y + 13);
+
+    ctx.strokeStyle = "rgba(255, 222, 161, 0.35)";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(track.left, track.centerY);
+    ctx.lineTo(track.right, track.centerY);
+    ctx.stroke();
+
+    const fillWidth = (track.right - track.left) * level;
+    ctx.strokeStyle = "rgba(255, 222, 161, 0.85)";
+    ctx.beginPath();
+    ctx.moveTo(track.left, track.centerY);
+    ctx.lineTo(track.left + fillWidth, track.centerY);
+    ctx.stroke();
+
+    const knobX = track.left + fillWidth;
+    ctx.fillStyle = "#fff4dc";
+    ctx.beginPath();
+    ctx.arc(knobX, track.centerY, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 222, 161, 0.32)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  handleVolumeSlider(input, currentVolume, onVolumeChange) {
+    const onSlider = input.isMouseOver(this.volumeSlider);
+
+    if (input.isPointerHeld()) {
+      if (!this.volumeDragging && onSlider) {
+        this.volumeDragging = true;
+        input.consumeClick();
+      }
+
+      if (this.volumeDragging) {
+        const nextVolume = this.volumeFromX(input.mousePosition.x);
+
+        if (Math.abs(nextVolume - currentVolume) >= 0.005) {
+          onVolumeChange(nextVolume);
+        }
+      }
+
+      return;
+    }
+
+    this.volumeDragging = false;
   }
 
   drawMuteButton(muted) {
@@ -165,11 +262,7 @@ export class UISystem {
   }
 
   consumeMuteClick(input) {
-    if (!input.isMouseOver(this.muteButton)) {
-      return false;
-    }
-
-    return input.consumeClick();
+    return input.consumeUiClick(this.muteButton);
   }
 
   drawLoadoutPanel(weapons, passives) {
@@ -278,16 +371,39 @@ export class UISystem {
     }
 
     const ctx = this.context;
+    const centerX = this.width / 2;
+    const fade = announcement.alpha ?? 1;
 
     ctx.save();
-    ctx.globalAlpha = announcement.alpha;
+    ctx.globalAlpha = fade;
+
+    ctx.fillStyle = "rgba(8, 9, 12, 0.72)";
+    ctx.fillRect(centerX - 520, 72, 1040, 118);
+    ctx.strokeStyle = "rgba(255, 222, 161, 0.35)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(centerX - 520, 72, 1040, 118);
+
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "900 48px 'Courier New', monospace";
-    ctx.fillStyle = "rgba(8, 9, 12, 0.82)";
-    ctx.fillText(announcement.text, this.width / 2 + 3, 118);
-    ctx.fillStyle = "#fff4dc";
-    ctx.fillText(announcement.text, this.width / 2, 115);
+
+    ctx.font = "900 54px 'Courier New', monospace";
+    ctx.fillStyle = "rgba(8, 9, 12, 0.85)";
+    ctx.fillText(announcement.title ?? announcement.text ?? "", centerX + 3, 112);
+    ctx.fillStyle = "#ffe09a";
+    ctx.fillText(announcement.title ?? announcement.text ?? "", centerX, 109);
+
+    if (announcement.worldName) {
+      ctx.font = "700 28px system-ui, sans-serif";
+      ctx.fillStyle = "#fff4dc";
+      ctx.fillText(announcement.worldName, centerX, 152);
+    }
+
+    if (announcement.subtitle) {
+      ctx.font = "500 22px system-ui, sans-serif";
+      ctx.fillStyle = "#b8c4d0";
+      ctx.fillText(announcement.subtitle, centerX, 178);
+    }
+
     ctx.restore();
   }
 
@@ -338,20 +454,47 @@ export class UISystem {
     ctx.textAlign = "left";
   }
 
+  drawAbilityCooldowns(dashProgress, manualShotProgress) {
+    const ctx = this.context;
+    const centerX = this.width / 2;
+    const y = this.height - 96;
+    const slotWidth = 88;
+    const slotHeight = 10;
+    const gap = 24;
+
+    this.drawCooldownSlot(ctx, centerX - slotWidth - gap / 2, y, slotWidth, slotHeight, dashProgress, "DASH");
+    this.drawCooldownSlot(
+      ctx,
+      centerX + gap / 2,
+      y,
+      slotWidth,
+      slotHeight,
+      manualShotProgress,
+      "AIM",
+    );
+  }
+
+  drawCooldownSlot(ctx, x, y, width, height, progress, label) {
+    ctx.fillStyle = "rgba(8, 9, 12, 0.72)";
+    ctx.fillRect(x - 2, y - 18, width + 4, height + 22);
+    ctx.fillStyle = "#17243a";
+    ctx.fillRect(x, y, width, height);
+    ctx.fillStyle = progress >= 1 ? "#7fd88a" : "#ffe09a";
+    ctx.fillRect(x, y, width * clamp(progress, 0, 1), height);
+
+    ctx.font = "600 14px system-ui, sans-serif";
+    ctx.fillStyle = "#b8c4d0";
+    ctx.textAlign = "center";
+    ctx.fillText(label, x + width / 2, y - 4);
+    ctx.textAlign = "left";
+  }
+
   drawLevelUp(choices) {
+    this.layoutUpgradeChoiceCards(choices);
+
     const ctx = this.context;
     const panelX = this.width / 2 - 650;
     const panelY = this.height / 2 - 300;
-    const cardWidth = 390;
-    const cardHeight = 360;
-    const gap = 34;
-
-    this.upgradeChoiceCards = choices.map((_, index) => ({
-      x: panelX + 34 + index * (cardWidth + gap),
-      y: panelY + 170,
-      width: cardWidth,
-      height: cardHeight,
-    }));
 
     ctx.save();
     ctx.fillStyle = "rgba(5, 6, 9, 0.7)";
@@ -374,11 +517,25 @@ export class UISystem {
     ctx.fillText("Choose one insight", this.width / 2, panelY + 112);
 
     choices.forEach((choice, index) => {
-      const card = this.upgradeChoiceCards[index];
-      this.drawUpgradeCard(choice, card, index);
+      this.drawUpgradeCard(choice, this.upgradeChoiceCards[index], index);
     });
 
     ctx.restore();
+  }
+
+  layoutUpgradeChoiceCards(choices) {
+    const panelX = this.width / 2 - 650;
+    const panelY = this.height / 2 - 300;
+    const cardWidth = 390;
+    const cardHeight = 360;
+    const gap = 34;
+
+    this.upgradeChoiceCards = choices.map((_, index) => ({
+      x: panelX + 34 + index * (cardWidth + gap),
+      y: panelY + 170,
+      width: cardWidth,
+      height: cardHeight,
+    }));
   }
 
   drawUpgradeCard(choice, card, index) {
@@ -442,11 +599,13 @@ export class UISystem {
   }
 
   getClickedUpgradeChoice(input) {
-    if (!input.consumeClick()) {
-      return -1;
+    for (let index = 0; index < this.upgradeChoiceCards.length; index += 1) {
+      if (input.consumeUiClick(this.upgradeChoiceCards[index])) {
+        return index;
+      }
     }
 
-    return this.upgradeChoiceCards.findIndex((card) => input.isMouseOver(card));
+    return -1;
   }
 
   consumeChestContinueClick(input) {

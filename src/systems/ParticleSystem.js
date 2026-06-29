@@ -2,6 +2,7 @@ export class ParticleSystem {
   constructor(maxParticles = 180) {
     this.particles = [];
     this.maxParticles = maxParticles;
+    this.screenScratch = { x: 0, y: 0 };
   }
 
   clear() {
@@ -65,12 +66,12 @@ export class ParticleSystem {
   }
 
   update(deltaTime) {
-    for (let i = this.particles.length - 1; i >= 0; i -= 1) {
-      const particle = this.particles[i];
+    let writeIndex = 0;
+
+    for (const particle of this.particles) {
       particle.life -= deltaTime;
 
       if (particle.life <= 0) {
-        this.particles.splice(i, 1);
         continue;
       }
 
@@ -79,21 +80,30 @@ export class ParticleSystem {
       particle.vy += particle.gravity * deltaTime;
       particle.x += particle.vx * deltaTime;
       particle.y += particle.vy * deltaTime;
+      this.particles[writeIndex] = particle;
+      writeIndex += 1;
     }
+
+    this.particles.length = writeIndex;
   }
 
   draw(ctx, camera) {
+    const screen = this.screenScratch;
+
+    ctx.save();
+
     for (const particle of this.particles) {
       const alpha = Math.max(0, particle.life / particle.maxLife);
-      const screen = camera.worldToScreen({ x: particle.x, y: particle.y });
+      screen.x = particle.x - camera.position.x;
+      screen.y = particle.y - camera.position.y;
 
-      ctx.save();
       ctx.globalAlpha = alpha;
       ctx.fillStyle = particle.color;
       ctx.beginPath();
       ctx.arc(screen.x, screen.y, particle.size * alpha, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
     }
+
+    ctx.restore();
   }
 }
