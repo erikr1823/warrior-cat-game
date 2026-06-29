@@ -1,0 +1,552 @@
+import { Camera } from "./Camera.js";
+import { Input } from "./Input.js";
+import { isOffScreen } from "./MathUtils.js";
+import { GameConfig } from "../config/GameConfig.js";
+import { GameIdentity } from "../config/GameIdentity.js";
+import { Player } from "../entities/Player.js";
+import { CollisionSystem } from "../systems/CollisionSystem.js";
+import { MenuSystem } from "../systems/MenuSystem.js";
+import { Renderer } from "../systems/Renderer.js";
+import { Spawner } from "../systems/Spawner.js";
+import { UISystem } from "../systems/UISystem.js";
+import { PassiveSystem } from "../systems/PassiveSystem.js";
+import { UpgradeSystem } from "../systems/UpgradeSystem.js";
+import { WeaponSystem } from "../systems/WeaponSystem.js";
+import { ChestRewardSystem } from "../systems/ChestRewardSystem.js";
+import { SaveSystem } from "../systems/SaveSystem.js";
+import { MetaUpgradeSystem } from "../systems/MetaUpgradeSystem.js";
+import { ShopSystem } from "../systems/ShopSystem.js";
+import { PauseMenuSystem } from "../systems/PauseMenuSystem.js";
+import { applyCharacterToRun } from "../systems/CharacterBonusSystem.js";
+import { getCharacterDefinition } from "../config/CharacterDefinitions.js";
+import { WorldMap } from "../systems/WorldMap.js";
+import { FeedbackSystem } from "../systems/FeedbackSystem.js";
+import { ProjectilePool } from "../systems/ProjectilePool.js";
+import { removeDeadInPlace } from "./EntityCleanup.js";
+import { preloadEnemyArt } from "../assets/EnemyVisuals.js";
+
+export class Game {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.context = canvas.getContext("2d");
+    this.width = GameConfig.resolution.width;
+    this.height = GameConfig.resolution.height;
+    this.canvas.width = this.width;
+    this.canvas.height = this.height;
+    this.lastTime = 0;
+    this.fps = 0;
+    this.frameSmoothing = 0.9;
+    this.running = false;
+    this.state = "menu";
+
+    this.saveSystem = new SaveSystem();
+    this.saveData = this.saveSystem.load();
+    this.metaUpgradeSystem = new MetaUpgradeSystem();
+
+    this.input = new Input(canvas);
+    this.camera = new Camera(this.width, this.height);
+    this.renderer = new Renderer(this.context, this.width, this.height);
+    this.menu = new MenuSystem(this.context, this.width, this.height);
+    this.shop = new ShopSystem(this.context, this.width, this.height);
+    this.pauseMenu = new PauseMenuSystem(this.context, this.width, this.height);
+    this.ui = new UISystem(this.context, this.width, this.height);
+    this.worldMap = new WorldMap();
+    this.feedback = new FeedbackSystem(this);
+    this.projectilePool = new ProjectilePool();
+    this.runSummary = null;
+    this.resetRun();
+  }
+
+  async initialize() {
+    preloadEnemyArt();
+    await this.worldMap.load();
+  }
+
+  start() {
+    this.running = true;
+    this.lastTime = performance.now();
+    requestAnimationFrame((time) => this.loop(time));
+  }
+
+  loop(currentTime) {
+    if (!this.running) {
+      return;
+    }
+
+    try {
+      const deltaTime = Math.min((currentTime - this.lastTime) / 1000, 0.1);
+      this.lastTime = currentTime;
+      this.updateFPS(deltaTime);
+
+      if (this.state === "menu") {
+        this.updateMenu();
+      } else if (this.state === "shop") {
+        this.updateShop();
+      } else if (this.state === "gameOver") {
+        this.updateGameOver(deltaTime);
+      } else if (this.state === "levelUp") {
+        this.updateLevelUp();
+      } else if (this.state === "chestReward") {
+        this.updateChestReward(deltaTime);
+      } else if (this.state === "paused") {
+        this.updatePaused();
+      } else {
+        this.update(deltaTime);
+      }
+
+      this.render();
+    } catch (error) {
+      console.error(error);
+      this.running = false;
+      showRuntimeError(error);
+    }
+
+    this.input.endFrame();
+
+    requestAnimationFrame((time) => this.loop(time));
+  }
+
+  updateMenu() {
+    if (this.menu.update(this.input)) {
+      this.feedback.ensureAudio();
+      this.state = "shop";
+    }
+  }
+
+  updateShop() {
+    if (this.ui.consumeMuteClick(this.input)) {
+      this.feedback.toggleMute();
+    }
+
+    const action = this.shop.update(this.input, this.saveData, this.metaUpgradeSystem, this.saveSystem);
+
+    if (action === "startRun") {
+      this.startRun();
+    }
+  }
+
+  updateGameOver(deltaTime) {
+    this.updateScreenShake(deltaTime);
+    this.feedback.update(deltaTime);
+
+    if (this.ui.consumeMuteClick(this.input)) {
+      this.feedback.toggleMute();
+    }
+
+    if (this.input.isRestartPressed() || this.ui.consumeGameOverRestartClick(this.input)) {
+      this.startRun();
+      return;
+    }
+
+    if (this.input.wasActionJustPressed() || this.ui.consumeGameOverShopClick(this.input)) {
+      this.state = "shop";
+    }
+  }
+
+  updateLevelUp() {
+    if (this.ui.consumeMuteClick(this.input)) {
+      this.feedback.toggleMute();
+    }
+
+    const keyboardChoice = this.input.getChoicePressed();
+    const clickedChoice = this.ui.getClickedUpgradeChoice(this.input);
+    const choiceIndex = clickedChoice >= 0 ? clickedChoice : keyboardChoice;
+
+    if (choiceIndex >= 0 && this.levelUpChoices[choiceIndex]) {
+      this.chooseUpgrade(choiceIndex);
+    }
+  }
+
+  updatePaused() {
+    if (this.ui.consumeMuteClick(this.input)) {
+      this.feedback.toggleMute();
+    }
+
+    if (this.input.wasPauseJustPressed()) {
+      if (this.pauseMenu.page === "main") {
+        this.resumeFromPause();
+      } else {
+        this.pauseMenu.page = "main";
+      }
+
+      return;
+    }
+
+    const action = this.pauseMenu.update(this.input, this, this.shop);
+
+    if (action === "resume") {
+      this.resumeFromPause();
+      return;
+    }
+
+    if (action === "bureau") {
+      this.pauseMenu.page = "bureau";
+      return;
+    }
+
+    if (action === "profile") {
+      this.pauseMenu.page = "charInfo";
+      return;
+    }
+
+    if (action === "abandon") {
+      this.abandonRun();
+    }
+  }
+
+  openPause() {
+    if (this.state !== "playing" || this.player.isDead) {
+      return false;
+    }
+
+    this.pauseMenu.reset();
+    this.state = "paused";
+    return true;
+  }
+
+  resumeFromPause() {
+    this.pauseMenu.reset();
+    this.state = "playing";
+  }
+
+  abandonRun() {
+    this.finalLevel = this.player.level;
+    this.saveData.totalCoins += this.coins;
+    this.saveSystem.save(this.saveData);
+    this.pauseMenu.reset();
+    this.resetRun();
+    this.state = "shop";
+  }
+
+  tryOpenPauseFromInput() {
+    if (this.ui.consumePauseClick(this.input) || this.input.wasPauseJustPressed()) {
+      return this.openPause();
+    }
+
+    return false;
+  }
+
+  updateChestReward(deltaTime) {
+    this.feedback.update(deltaTime);
+    this.chestAnimation.time += deltaTime;
+
+    if (this.ui.consumeMuteClick(this.input)) {
+      this.feedback.toggleMute();
+    }
+
+    const animationConfig = GameConfig.chests.animation;
+    const canContinue = this.chestAnimation.time >= animationConfig.revealDelay + 0.12;
+
+    if (
+      canContinue &&
+      (this.input.wasActionJustPressed() || this.ui.consumeChestContinueClick(this.input))
+    ) {
+      this.chestRewardSystem.applyReward(this, this.chestReward);
+      this.chestReward = null;
+      this.chestAnimation = null;
+      this.state = "playing";
+      this.processLevelUps();
+    }
+  }
+
+  update(deltaTime) {
+    if (this.tryOpenPauseFromInput()) {
+      return;
+    }
+
+    this.survivalTime += deltaTime;
+    this.updateScreenShake(deltaTime);
+    this.feedback.update(deltaTime);
+    this.player.update(deltaTime, this.input);
+
+    if (this.ui.consumeMuteClick(this.input)) {
+      this.feedback.toggleMute();
+    }
+    this.worldMap.clampPosition(this.player.position);
+    this.camera.follow(this.player.position);
+    this.spawner.update(deltaTime, this);
+    this.weaponSystem.update(deltaTime, this);
+
+    for (const enemy of this.enemies) {
+      enemy.update(deltaTime, this.player);
+    }
+
+    for (const projectile of this.projectiles) {
+      projectile.update(deltaTime);
+
+      if (isOffScreen(projectile.position, this.camera, this.width, this.height)) {
+        projectile.isDead = true;
+      }
+    }
+
+    for (const damageNumber of this.damageNumbers) {
+      damageNumber.update(deltaTime);
+    }
+
+    for (const xpGem of this.xpGems) {
+      xpGem.update(deltaTime, this.player, this);
+    }
+
+    for (const coinPickup of this.coinPickups) {
+      coinPickup.update(deltaTime, this.player, this);
+    }
+
+    for (const chest of this.chests) {
+      chest.update(deltaTime);
+    }
+
+    this.collisionSystem.update(deltaTime, this);
+    this.removeDeadEntities();
+    this.processLevelUps();
+  }
+
+  render() {
+    this.renderer.clear();
+
+    if (this.state === "menu") {
+      this.menu.draw(this.input);
+      return;
+    }
+
+    if (this.state === "shop") {
+      this.shop.draw(this.input, this.saveData, this.metaUpgradeSystem);
+      this.ui.drawMuteButton(this.feedback.isMuted());
+      return;
+    }
+
+    const isGameplayView =
+      this.state === "playing" ||
+      this.state === "paused" ||
+      this.state === "levelUp" ||
+      this.state === "chestReward" ||
+      this.state === "gameOver";
+
+    if (!isGameplayView) {
+      return;
+    }
+    this.renderer.setShake(this.screenShake);
+    const currentWorld = this.spawner.getWaveDirector().getCurrentWorld(this.survivalTime);
+    this.worldMap.setTilePalette(currentWorld.tilePalette);
+    this.renderer.drawBackground(this.camera, this.worldMap);
+    this.renderer.drawWeaponEffects(this.weaponSystem, this.player, this.camera);
+    this.renderer.drawProjectiles(this.projectiles, this.camera);
+    this.renderer.drawXPGems(this.xpGems, this.camera);
+    this.renderer.drawCoinPickups(this.coinPickups, this.camera);
+    this.renderer.drawChests(this.chests, this.camera);
+    this.renderer.drawEnemies(this.enemies, this.camera);
+    this.renderer.drawPlayer(this.player, this.camera);
+    this.renderer.drawParticles(this.feedback.particles, this.camera);
+    this.renderer.drawDamageNumbers(this.damageNumbers, this.camera);
+    this.renderer.drawBossHealthBar(this.enemies, this.width);
+    this.renderer.resetTransform();
+    this.ui.draw({
+      title: GameIdentity.title,
+      fps: this.fps,
+      playerPosition: this.player.position,
+      playerHealth: this.player.health,
+      playerMaxHealth: this.player.maxHealth,
+      killCount: this.killCount,
+      survivalTime: this.survivalTime,
+      enemyCount: this.enemies.length,
+      finalLevel: this.finalLevel,
+      playerLevel: this.player.level,
+      playerXP: this.player.xp,
+      playerXPToNextLevel: this.player.xpToNextLevel,
+      weapons: this.weaponSystem.getOwnedWeaponSummary(),
+      passives: this.passiveSystem.getOwnedPassiveSummary(),
+      coins: this.coins,
+      wave: this.spawner.getWaveDirector().getDisplayInfo(this.survivalTime),
+      waveAnnouncement:
+        this.spawner.getBossDirector().getAnnouncement() ??
+        this.spawner.getWaveDirector().getAnnouncement(),
+      muted: this.feedback.isMuted(),
+      lowHealthPulse: this.feedback.getLowHealthPulse(),
+      projectileCount: this.projectiles.length,
+      particleCount: this.feedback.particles.particles.length,
+      pickupCount: this.xpGems.length + this.coinPickups.length,
+      showPauseButton: this.state === "playing",
+    });
+
+    if (this.state === "levelUp") {
+      this.ui.drawLevelUp(this.levelUpChoices);
+    }
+
+    if (this.state === "chestReward") {
+      this.ui.drawChestReward(this.chestReward, this.chestAnimation);
+    }
+
+    if (this.state === "gameOver") {
+      this.ui.drawGameOver(this.runSummary);
+    }
+
+    if (this.state === "paused") {
+      this.pauseMenu.draw(this.input, this, this.shop);
+    }
+
+    this.renderer.drawLowHealthOverlay(
+      this.player.health,
+      this.player.maxHealth,
+      this.feedback.getLowHealthPulse(),
+    );
+  }
+
+  removeDeadEntities() {
+    removeDeadInPlace(this.enemies);
+    removeDeadInPlace(this.projectiles, (projectile) => this.projectilePool.release(projectile));
+    removeDeadInPlace(this.damageNumbers);
+    removeDeadInPlace(this.xpGems);
+    removeDeadInPlace(this.coinPickups);
+    removeDeadInPlace(this.chests);
+  }
+
+  resetRun() {
+    this.survivalTime = 0;
+    this.killCount = 0;
+    this.bossDefeatedCount = 0;
+    this.runEvolutions = [];
+    this.startingCoinBonus = 0;
+    this.finalLevel = 1;
+    this.runModifiers = {
+      damageMultiplier: 1,
+      xpMultiplier: 1,
+      moveSpeedMultiplier: 1,
+      pickupRangeMultiplier: 1,
+    };
+    this.screenShake = { amount: 0, time: 0, duration: 0 };
+    this.feedback.clearRunEffects();
+    this.player = new Player(0, 0, this.saveData.selectedCharacter ?? "puzas");
+    this.enemies = [];
+    this.projectiles = [];
+    this.damageNumbers = [];
+    this.xpGems = [];
+    this.coinPickups = [];
+    this.chests = [];
+    this.coins = 0;
+    this.levelUpChoices = [];
+    this.chestReward = null;
+    this.chestAnimation = null;
+    this.runSummary = null;
+    this.spawner = new Spawner(this.camera);
+    this.weaponSystem = new WeaponSystem();
+    this.passiveSystem = new PassiveSystem();
+    this.collisionSystem = new CollisionSystem();
+    this.upgradeSystem = new UpgradeSystem();
+    this.chestRewardSystem = new ChestRewardSystem();
+    this.metaUpgradeSystem.applyToRun(this);
+    applyCharacterToRun(this);
+    this.camera.follow(this.player.position);
+  }
+
+  startRun() {
+    this.feedback.ensureAudio();
+    this.pauseMenu.reset();
+    this.resetRun();
+    this.state = "playing";
+  }
+
+  openChest(chest) {
+    if (this.state !== "playing" || this.player.isDead) {
+      return;
+    }
+
+    this.chestReward = this.chestRewardSystem.rollReward(this);
+    this.chestAnimation = { time: 0 };
+    this.feedback.onChestOpen();
+    this.state = "chestReward";
+  }
+
+  endRun() {
+    if (this.state === "gameOver") {
+      return;
+    }
+
+    this.finalLevel = this.player.level;
+    this.saveData.totalCoins += this.coins;
+    this.saveSystem.save(this.saveData);
+
+    const weapons = this.weaponSystem.getOwnedWeaponSummary().map((weapon) => weapon.name);
+
+    this.runSummary = {
+      survivalTime: this.survivalTime,
+      finalLevel: this.finalLevel,
+      killCount: this.killCount,
+      bossDefeatedCount: this.bossDefeatedCount,
+      coinsEarned: this.coins,
+      startingCoinBonus: this.startingCoinBonus,
+      totalCoins: this.saveData.totalCoins,
+      weapons,
+      evolutions: [...this.runEvolutions],
+    };
+
+    this.feedback.onGameOver();
+    this.state = "gameOver";
+  }
+
+  processLevelUps() {
+    if (this.state !== "playing" || this.player.isDead) {
+      return;
+    }
+
+    while (this.player.canLevelUp()) {
+      this.player.levelUpOnce();
+      this.finalLevel = this.player.level;
+      this.levelUpChoices = this.upgradeSystem.getChoices(3, this);
+      this.feedback.onLevelUp();
+      this.state = "levelUp";
+      return;
+    }
+  }
+
+  chooseUpgrade(choiceIndex) {
+    const choice = this.levelUpChoices[choiceIndex];
+
+    if (!choice || this.state !== "levelUp" || this.player.isDead) {
+      return;
+    }
+
+    this.upgradeSystem.applyUpgrade(this, choice);
+    this.levelUpChoices = [];
+
+    if (this.player.canLevelUp()) {
+      this.processLevelUps();
+      return;
+    }
+
+    this.state = "playing";
+  }
+
+  startScreenShake(amount, duration) {
+    this.screenShake.amount = amount;
+    this.screenShake.duration = duration;
+    this.screenShake.time = duration;
+  }
+
+  updateScreenShake(deltaTime) {
+    this.screenShake.time = Math.max(0, this.screenShake.time - deltaTime);
+  }
+
+  updateFPS(deltaTime) {
+    if (deltaTime <= 0) {
+      return;
+    }
+
+    const currentFPS = 1 / deltaTime;
+    this.fps = this.fps * this.frameSmoothing + currentFPS * (1 - this.frameSmoothing);
+  }
+}
+
+function showRuntimeError(error) {
+  const shell = document.querySelector("#game-shell");
+
+  if (!shell) {
+    return;
+  }
+
+  shell.innerHTML = `
+    <div style="max-width:720px;padding:32px;text-align:center;font-family:monospace;">
+      <h1 style="color:#ffe09a;margin:0 0 16px;">${GameIdentity.title} crashed</h1>
+      <p style="color:#d9e8e2;line-height:1.6;">Reload the page to try again.</p>
+      <pre style="margin-top:20px;padding:16px;background:rgba(0,0,0,0.35);color:#ff9a9a;text-align:left;overflow:auto;">${error?.stack ?? error?.message ?? error}</pre>
+    </div>
+  `;
+}

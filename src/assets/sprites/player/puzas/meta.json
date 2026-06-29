@@ -1,0 +1,11 @@
+{
+    "frameHeight":  72,
+    "framesPerDirection":  3,
+    "directionRows":  {
+                          "left":  1,
+                          "right":  2,
+                          "down":  0,
+                          "up":  3
+                      },
+    "frameWidth":  48
+}

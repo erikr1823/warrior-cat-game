@@ -1,0 +1,12 @@
+{
+  "name": "warrior-cat-game-test",
+  "private": true,
+  "description": "Warrior Cat Game Test - HTML5 canvas survivor prototype (Lanternfall build)",
+  "scripts": {
+    "build": "echo Static game - no build needed",
+    "start": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-dev.ps1",
+    "start:none": "npx --yes serve -l 8765 .",
+    "setup:characters": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/setup-characters.ps1",
+    "setup:enemies": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/import-enemy-packs.ps1"
+  }
+}

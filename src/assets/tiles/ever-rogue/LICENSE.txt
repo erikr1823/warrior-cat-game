@@ -1,0 +1,9 @@
+# Game Assets
+
+## Ever Rogue Tileset
+
+- **Author:** [Efilheim](https://efilheim.itch.io/ever-rogue)
+- **Source:** https://itch.io/game-assets/tag-royalty-free/tag-top-down (via [OpenGameArt.org](https://opengameart.org/content/ever-rogue-tileset))
+- **License:** [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) — free for commercial use, no attribution required
+
+Files live in `src/assets/tiles/ever-rogue/`.
