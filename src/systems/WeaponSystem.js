@@ -37,12 +37,7 @@ export class WeaponSystem {
     }
   }
 
-  triggerManualBurst() {
-    for (const weapon of this.weapons.values()) {
-      weapon.timer = 0;
-    }
-  }
-
+  /** Manual Ink Flick — separate from auto-fire weapons; left click / touch action. */
   fireManualInkFlick(game, direction) {
     if (this.manualShotCooldown > 0) {
       return false;
@@ -317,6 +312,19 @@ export class WeaponSystem {
 
         damageEnemy(game, enemy, weapon.damage, directionBetween(game.player.position, enemy.position));
         weapon.hitTimers.set(enemy, weapon.hitCooldown);
+
+        // Synergy: Storm Blades — blades occasionally call a small lightning strike.
+        if (game.synergySystem?.has("stormBlades") && Math.random() < 0.18) {
+          damageEnemy(game, enemy, Math.round(weapon.damage * 0.7), { x: 0, y: 1 });
+          this.visualEffects.push({
+            type: "lightning",
+            start: { x: enemy.position.x, y: enemy.position.y - 170 },
+            end: { ...enemy.position },
+            life: 0.18,
+            maxLife: 0.18,
+            visualStyle: "lightning",
+          });
+        }
       }
     }
   }
@@ -346,6 +354,11 @@ export class WeaponSystem {
       if (distanceBetween(game.player.position, enemy.position) <= weapon.radius + enemy.radius) {
         damageEnemy(game, enemy, weapon.damage, directionBetween(game.player.position, enemy.position));
         hits += 1;
+
+        // Synergy: Divine Static — Lantern Pulse marks enemies for bonus lightning.
+        if (game.synergySystem?.has("divineStatic")) {
+          enemy.staticMark = 3;
+        }
       }
     }
 
@@ -354,6 +367,11 @@ export class WeaponSystem {
         game.player.maxHealth,
         game.player.health + weapon.healOnHit * hits,
       );
+    }
+
+    // Synergy: Iron Faith — a Lantern Pulse that hits enough foes grants a shield.
+    if (game.synergySystem?.has("ironFaith") && hits >= 4) {
+      game.player.invincibilityTime = Math.max(game.player.invincibilityTime, 1.1);
     }
   }
 
@@ -390,7 +408,15 @@ export class WeaponSystem {
     }
 
     hitEnemies.add(enemy);
-    damageEnemy(game, enemy, weapon.damage, { x: 0, y: 1 });
+
+    // Synergy: Divine Static — marked enemies take bonus lightning damage.
+    let strikeDamage = weapon.damage;
+
+    if (game.synergySystem?.has("divineStatic") && enemy.staticMark > 0) {
+      strikeDamage = Math.round(weapon.damage * 1.5);
+    }
+
+    damageEnemy(game, enemy, strikeDamage, { x: 0, y: 1 });
     this.visualEffects.push({
       type: "lightning",
       start: { x: enemy.position.x, y: enemy.position.y - 190 },
@@ -400,11 +426,17 @@ export class WeaponSystem {
       visualStyle: weapon.visualStyle ?? "lightning",
     });
 
-    if (!weapon.chainChance || Math.random() >= weapon.chainChance) {
+    // Synergy: Lucky Overcharge — extra chance for lightning to chain again.
+    const baseChainChance = weapon.chainChance ?? 0;
+    const bonusChainChance = game.synergySystem?.has("luckyOvercharge") ? 0.25 : 0;
+    const chainChance = baseChainChance + bonusChainChance;
+
+    if (chainChance <= 0 || Math.random() >= chainChance) {
       return;
     }
 
-    const chainTarget = this.findChainTarget(enemy, game.enemies, weapon.chainRadius, hitEnemies);
+    const chainRadius = weapon.chainRadius ?? 220;
+    const chainTarget = this.findChainTarget(enemy, game.enemies, chainRadius, hitEnemies);
 
     if (chainTarget) {
       this.strikeWithLightning(game, weapon, chainTarget, hitEnemies);

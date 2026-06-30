@@ -1,4 +1,6 @@
 export const WAVE_STAGES = [
+  // Regular waves use the working imported enemies (slime + zombie/undead family).
+  // Do NOT add the old ugly/disabled types — see src/config/EnemyRoster.md.
   {
     id: 1,
     startTime: 0,
@@ -18,7 +20,8 @@ export const WAVE_STAGES = [
     announcement: "Biome II — Summer Forest",
     worldId: "summerForest",
     spawnWeights: {
-      slime: 1,
+      slime: 0.75,
+      zombie: 0.25,
     },
   },
   {
@@ -29,7 +32,9 @@ export const WAVE_STAGES = [
     announcement: "Biome III — Moonlit Forest",
     worldId: "moonlitForest",
     spawnWeights: {
-      slime: 1,
+      slime: 0.55,
+      zombie: 0.3,
+      greenDragon: 0.15,
     },
   },
   {
@@ -41,7 +46,8 @@ export const WAVE_STAGES = [
     worldId: "ancientCrypt",
     spawnIntervalMultiplier: 0.92,
     spawnWeights: {
-      slime: 1,
+      slime: 0.6,
+      zombie: 0.4,
     },
   },
   {
@@ -53,7 +59,8 @@ export const WAVE_STAGES = [
     worldId: "graveyard",
     spawnIntervalMultiplier: 0.86,
     spawnWeights: {
-      slime: 1,
+      slime: 0.6,
+      zombie: 0.4,
     },
   },
   {
@@ -65,7 +72,8 @@ export const WAVE_STAGES = [
     worldId: "cursedRuins",
     spawnIntervalMultiplier: 0.8,
     spawnWeights: {
-      slime: 1,
+      slime: 0.6,
+      zombie: 0.4,
     },
   },
   {
@@ -77,7 +85,8 @@ export const WAVE_STAGES = [
     worldId: "royalArchive",
     spawnIntervalMultiplier: 0.74,
     spawnWeights: {
-      slime: 1,
+      slime: 0.6,
+      zombie: 0.4,
     },
   },
   {
@@ -89,7 +98,9 @@ export const WAVE_STAGES = [
     worldId: "plagueVault",
     spawnIntervalMultiplier: 0.68,
     spawnWeights: {
-      slime: 1,
+      slime: 0.5,
+      zombie: 0.25,
+      brainZombie: 0.25,
     },
   },
   {
@@ -101,7 +112,10 @@ export const WAVE_STAGES = [
     worldId: "frostBarrow",
     spawnIntervalMultiplier: 0.62,
     spawnWeights: {
-      slime: 1,
+      slime: 0.4,
+      zombie: 0.2,
+      brainZombie: 0.2,
+      vikingUndead: 0.2,
     },
   },
   {
@@ -113,7 +127,11 @@ export const WAVE_STAGES = [
     worldId: "boneCrypt",
     spawnIntervalMultiplier: 0.56,
     spawnWeights: {
-      slime: 1,
+      slime: 0.3,
+      zombie: 0.15,
+      brainZombie: 0.15,
+      vikingUndead: 0.15,
+      skeletonUndead: 0.25,
     },
   },
   {
@@ -125,7 +143,13 @@ export const WAVE_STAGES = [
     worldId: "fallenParade",
     spawnIntervalMultiplier: 0.5,
     spawnWeights: {
-      slime: 1,
+      slime: 0.2,
+      zombie: 0.1,
+      brainZombie: 0.1,
+      vikingUndead: 0.1,
+      skeletonUndead: 0.15,
+      popstarUndead: 0.175,
+      knightUndead: 0.175,
     },
   },
 ];

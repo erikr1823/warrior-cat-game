@@ -1,17 +1,6 @@
 import { GameConfig } from "../config/GameConfig.js";
 import { applyFallback, getFallbackChoices } from "./PassiveSystem.js";
 
-function shuffle(items) {
-  const shuffled = [...items];
-
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
-  }
-
-  return shuffled;
-}
-
 function uniqueChoices(choices) {
   const seen = new Set();
 
@@ -20,6 +9,8 @@ function uniqueChoices(choices) {
       choice.type,
       choice.weaponId,
       choice.passiveId,
+      choice.traitId,
+      choice.synergyId,
       choice.id,
       choice.name,
     ].filter(Boolean).join(":");
@@ -33,11 +24,57 @@ function uniqueChoices(choices) {
   });
 }
 
+// Picks `count` distinct choices using each choice's relative weight, so Traits
+// and Synergies (lower weight) appear less often than normal weapon/passive ups.
+function weightedSample(choices, count) {
+  const pool = choices.map((choice) => ({
+    choice,
+    weight: choice._weight ?? 1,
+  }));
+  const picked = [];
+
+  while (picked.length < count && pool.length > 0) {
+    const totalWeight = pool.reduce((sum, entry) => sum + entry.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let chosenIndex = pool.length - 1;
+
+    for (let index = 0; index < pool.length; index += 1) {
+      roll -= pool[index].weight;
+
+      if (roll <= 0) {
+        chosenIndex = index;
+        break;
+      }
+    }
+
+    picked.push(pool[chosenIndex].choice);
+    pool.splice(chosenIndex, 1);
+  }
+
+  return picked;
+}
+
 export class UpgradeSystem {
   getChoices(count = 3, game) {
     const weaponChoices = game.weaponSystem.getAvailableWeaponChoices();
     const passiveChoices = game.passiveSystem.getAvailablePassiveChoices();
-    let pool = uniqueChoices([...weaponChoices, ...passiveChoices]);
+
+    const traitChoices = (game.traitSystem?.getAvailableTraitChoices() ?? []).map((choice) => ({
+      ...choice,
+      _weight: GameConfig.traits?.appearWeight ?? 0.5,
+    }));
+
+    const synergyChoices = (game.synergySystem?.getAvailableSynergyChoices(game) ?? []).map((choice) => ({
+      ...choice,
+      _weight: GameConfig.synergies?.appearWeight ?? 0.75,
+    }));
+
+    let pool = uniqueChoices([
+      ...weaponChoices,
+      ...passiveChoices,
+      ...traitChoices,
+      ...synergyChoices,
+    ]);
 
     if (pool.length === 0) {
       pool = getFallbackChoices();
@@ -45,7 +82,7 @@ export class UpgradeSystem {
       pool = uniqueChoices([...pool, ...getFallbackChoices()]);
     }
 
-    return shuffle(pool).slice(0, count);
+    return weightedSample(pool, count);
   }
 
   applyUpgrade(game, upgrade) {
@@ -66,6 +103,16 @@ export class UpgradeSystem {
 
     if (upgrade.type === "passiveUpgrade") {
       game.passiveSystem.levelUpPassive(upgrade.passiveId, game);
+      return;
+    }
+
+    if (upgrade.type === "trait") {
+      game.traitSystem?.acquireTrait(upgrade.traitId, game);
+      return;
+    }
+
+    if (upgrade.type === "synergy") {
+      game.synergySystem?.acquireSynergy(upgrade.synergyId, game);
       return;
     }
 

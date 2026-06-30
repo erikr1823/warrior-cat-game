@@ -3,7 +3,8 @@ import { getWeaponDefinition } from "../config/WeaponDefinitions.js";
 import { getPassiveDefinition } from "../config/PassiveDefinitions.js";
 
 export class ChestRewardSystem {
-  rollReward(game) {
+  rollReward(game, options = {}) {
+    const bloodPrice = options.bloodPrice === true;
     const evolutions = game.weaponSystem.getAvailableEvolutions(game);
 
     if (evolutions.length > 0) {
@@ -16,16 +17,21 @@ export class ChestRewardSystem {
     const luck = game.passiveSystem.getChestLuck();
     const pool = [];
 
+    // Chests prefer meaningful upgrades over coins; Blood Price boosts that further.
+    const upgradeWeight = (3.4 + luck * 2) * (bloodPrice ? 1.6 : 1);
+    const coinWeight = bloodPrice ? 0.5 : 1.2;
+    const healWeight = bloodPrice ? 1 : 1.6;
+
     for (const weaponId of weaponPool) {
-      pool.push({ kind: "weaponUpgrade", weaponId, weight: 3.2 + luck * 2 });
+      pool.push({ kind: "weaponUpgrade", weaponId, weight: upgradeWeight });
     }
 
     for (const passiveId of passivePool) {
-      pool.push({ kind: "passiveUpgrade", passiveId, weight: 3.2 + luck * 2 });
+      pool.push({ kind: "passiveUpgrade", passiveId, weight: upgradeWeight });
     }
 
-    pool.push({ kind: "coins", weight: 2 });
-    pool.push({ kind: "heal", weight: 2 });
+    pool.push({ kind: "coins", weight: coinWeight });
+    pool.push({ kind: "heal", weight: healWeight });
 
     const pick = this.pickWeighted(pool);
     return this.buildReward(game, pick);

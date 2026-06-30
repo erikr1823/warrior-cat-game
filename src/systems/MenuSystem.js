@@ -1,4 +1,5 @@
 import { GameConfig } from "../config/GameConfig.js";
+import { formatTime } from "../core/MathUtils.js";
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -21,8 +22,15 @@ export class MenuSystem {
       height: 104,
       label: "START RUN",
     };
+    this.leaderboardButton = {
+      x: width / 2 - 380,
+      y: 888,
+      width: 360,
+      height: 56,
+      label: "LEADERBOARDS",
+    };
     this.creditsButton = {
-      x: width / 2 - 180,
+      x: width / 2 + 20,
       y: 888,
       width: 360,
       height: 56,
@@ -36,6 +44,10 @@ export class MenuSystem {
       label: "BACK",
     };
     this.page = "main";
+    this.leaderboard = null;
+    this.leaderboardEntries = [];
+    this.leaderboardStatus = "";
+    this.leaderboardLoading = false;
     this.creditPhotos = {
       erik: this.loadCreditPhoto("./src/assets/credits/erik-rivera.png"),
       bruce: this.loadCreditPhoto("./src/assets/credits/bruce-odin-minnie.png"),
@@ -109,7 +121,7 @@ export class MenuSystem {
   }
 
   update(input) {
-    if (this.page === "credits") {
+    if (this.page === "credits" || this.page === "leaderboard") {
       const backHovered = input.isMouseOver(this.backButton);
       const clicked = input.consumeClick();
 
@@ -126,9 +138,16 @@ export class MenuSystem {
 
     const startHovered = input.isMouseOver(this.startButton);
     const creditsHovered = input.isMouseOver(this.creditsButton);
+    const leaderboardHovered = input.isMouseOver(this.leaderboardButton);
     const clicked = input.consumeClick();
 
-    if (creditsHovered && clicked) {
+    if (clicked && leaderboardHovered) {
+      this.page = "leaderboard";
+      this.loadLeaderboard();
+      return false;
+    }
+
+    if (clicked && creditsHovered) {
       this.page = "credits";
       return false;
     }
@@ -136,10 +155,50 @@ export class MenuSystem {
     return input.wasActionJustPressed() || (startHovered && clicked);
   }
 
+  async loadLeaderboard() {
+    if (!this.leaderboard || !this.leaderboard.isConfigured()) {
+      this.leaderboardEntries = [];
+      this.leaderboardLoading = false;
+      this.leaderboardStatus = "Leaderboard not configured yet";
+      return;
+    }
+
+    // Show cached scores instantly (no loading flash), then refresh in background.
+    const cached = this.leaderboard.getCachedScores();
+
+    if (cached) {
+      this.leaderboardEntries = cached;
+      this.leaderboardStatus = cached.length === 0 ? "No scores yet. Be the first!" : "";
+      this.leaderboardLoading = false;
+    } else {
+      this.leaderboardLoading = true;
+      this.leaderboardStatus = "";
+      this.leaderboardEntries = [];
+    }
+
+    const result = await this.leaderboard.getTopScores(10);
+
+    // Ignore late responses if the player already left the page.
+    if (this.page !== "leaderboard") {
+      return;
+    }
+
+    this.leaderboardLoading = false;
+
+    if (result.ok) {
+      this.leaderboardEntries = result.scores;
+      this.leaderboardStatus = result.scores.length === 0 ? "No scores yet. Be the first!" : "";
+    } else if (this.leaderboardEntries.length === 0) {
+      // Only surface the error if we have nothing cached to show.
+      this.leaderboardStatus = "Could not load leaderboard";
+    }
+  }
+
   draw(input) {
     const ctx = this.context;
     const startHovered = input.isMouseOver(this.startButton);
     const creditsHovered = input.isMouseOver(this.creditsButton);
+    const leaderboardHovered = input.isMouseOver(this.leaderboardButton);
 
     ctx.save();
     ctx.imageSmoothingEnabled = true;
@@ -152,10 +211,94 @@ export class MenuSystem {
       return;
     }
 
+    if (this.page === "leaderboard") {
+      this.drawLeaderboardOverlay(input);
+      ctx.restore();
+      return;
+    }
+
     this.drawButton(this.startButton, startHovered);
+    this.drawSecondaryButton(this.leaderboardButton, leaderboardHovered);
     this.drawSecondaryButton(this.creditsButton, creditsHovered);
     this.drawHint();
     ctx.restore();
+  }
+
+  drawLeaderboardOverlay(input) {
+    const ctx = this.context;
+    const centerX = this.width / 2;
+    const panel = {
+      x: centerX - 480,
+      y: 160,
+      width: 960,
+      height: 720,
+    };
+    const backHovered = input.isMouseOver(this.backButton);
+
+    ctx.fillStyle = "rgba(5, 8, 13, 0.62)";
+    ctx.fillRect(0, 0, this.width, this.height);
+
+    ctx.fillStyle = "rgba(15, 18, 24, 0.97)";
+    ctx.fillRect(panel.x, panel.y, panel.width, panel.height);
+    ctx.strokeStyle = "#ffd27e";
+    ctx.lineWidth = 5;
+    ctx.strokeRect(panel.x, panel.y, panel.width, panel.height);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "#fff4dc";
+    ctx.font = "900 56px 'Courier New', monospace";
+    ctx.fillText("LEADERBOARD", centerX, panel.y + 28);
+
+    ctx.font = "600 20px 'Courier New', monospace";
+    ctx.fillStyle = "#9eb0aa";
+    ctx.fillText("Top 10 — longest survival", centerX, panel.y + 96);
+
+    ctx.strokeStyle = "rgba(255, 210, 126, 0.35)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(panel.x + 48, panel.y + 136);
+    ctx.lineTo(panel.x + panel.width - 48, panel.y + 136);
+    ctx.stroke();
+
+    const leftX = panel.x + 64;
+    let rowY = panel.y + 158;
+
+    if (this.leaderboardLoading) {
+      ctx.textAlign = "center";
+      ctx.font = "600 26px 'Courier New', monospace";
+      ctx.fillStyle = "#9eb0aa";
+      ctx.fillText("Loading...", centerX, rowY + 20);
+    } else if (this.leaderboardStatus) {
+      ctx.textAlign = "center";
+      ctx.font = "600 24px 'Courier New', monospace";
+      ctx.fillStyle = this.leaderboardStatus.startsWith("Could not") ? "#ff8a72" : "#9eb0aa";
+      ctx.fillText(this.leaderboardStatus, centerX, rowY + 20);
+    } else {
+      ctx.textAlign = "left";
+      ctx.font = "700 22px 'Courier New', monospace";
+
+      this.leaderboardEntries.slice(0, 10).forEach((entry, index) => {
+        const rank = `${index + 1}.`.padEnd(4, " ");
+        const name = String(entry.player_name ?? "Player")
+          .toUpperCase()
+          .slice(0, 12)
+          .padEnd(12, " ");
+        const time = formatTime(entry.survival_time ?? 0).padStart(5, " ");
+        const line = `${rank}${name}  ${time}   ${entry.kills ?? 0} kills   Lv ${entry.final_level ?? 1}`;
+        ctx.fillStyle = index === 0 ? "#ffe09a" : "#d9e8e2";
+        ctx.fillText(line, leftX, rowY);
+        rowY += 44;
+      });
+    }
+
+    this.backButton.y = panel.y + panel.height - 96;
+    this.drawSecondaryButton(this.backButton, backHovered);
+
+    ctx.textAlign = "center";
+    ctx.font = "700 20px 'Courier New', monospace";
+    ctx.fillStyle = "#7a8a86";
+    ctx.fillText("ESC / ENTER / CLICK BACK", centerX, panel.y + panel.height - 32);
   }
 
   drawCreditsOverlay(input) {

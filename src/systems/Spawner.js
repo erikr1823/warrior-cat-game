@@ -5,6 +5,7 @@ import { getWorldForWave } from "../config/WorldDefinitions.js";
 import { Enemy } from "../entities/Enemy.js";
 import { WaveDirector } from "./WaveDirector.js";
 import { BossDirector } from "./BossDirector.js";
+import { pickModifierForTime, applyEnemyModifier } from "../config/EnemyModifiers.js";
 
 export class Spawner {
   constructor(camera) {
@@ -52,14 +53,50 @@ export class Spawner {
     );
     const speedMultiplier = this.waveDirector.getSpeedMultiplier(game.survivalTime);
 
-    game.enemies.push(
-      new Enemy(spawnPosition.x, spawnPosition.y, type, {
-        healthMultiplier,
-        speedMultiplier,
-        enemyPack: world.enemyPack,
-        worldId: world.id,
-      }),
-    );
+    const enemy = new Enemy(spawnPosition.x, spawnPosition.y, type, {
+      healthMultiplier,
+      speedMultiplier,
+      enemyPack: world.enemyPack,
+      worldId: world.id,
+    });
+
+    this.maybeApplyEliteModifier(enemy, game);
+    game.enemies.push(enemy);
+  }
+
+  // Gradually introduces elite behavior modifiers as the run goes on, capped so
+  // there are never too many special enemies at once.
+  maybeApplyEliteModifier(enemy, game) {
+    const config = GameConfig.eliteModifiers;
+
+    if (!config || game.survivalTime < config.firstSpawnTime) {
+      return;
+    }
+
+    let modifiedCount = 0;
+
+    for (const existing of game.enemies) {
+      if (existing.isEliteModified && !existing.isDead) {
+        modifiedCount += 1;
+      }
+    }
+
+    if (modifiedCount >= config.maxModifiedEnemies) {
+      return;
+    }
+
+    const minutes = game.survivalTime / 60;
+    const chance = Math.min(config.maxChance, config.baseChance + config.chancePerMinute * minutes);
+
+    if (Math.random() >= chance) {
+      return;
+    }
+
+    const modifierId = pickModifierForTime(game.survivalTime);
+
+    if (modifierId) {
+      applyEnemyModifier(enemy, modifierId);
+    }
   }
 
   getSpawnPosition(playerPosition, camera) {

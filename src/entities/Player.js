@@ -44,6 +44,7 @@ export class Player {
     this.dashDuration = 0;
     this.dashDirection = { x: 0, y: 0 };
     this.dashSpeed = GameConfig.player.dash.speed;
+    this.traitSpeedBoostTime = 0;
   }
 
   update(deltaTime, input) {
@@ -67,9 +68,11 @@ export class Player {
       return;
     }
 
+    this.traitSpeedBoostTime = Math.max(0, this.traitSpeedBoostTime - deltaTime);
+    const speedMultiplier = this.traitSpeedBoostTime > 0 ? 1.3 : 1;
     const movement = normalizeVector(input.getMovementVector());
-    this.velocity.x = movement.x * this.speed;
-    this.velocity.y = movement.y * this.speed;
+    this.velocity.x = movement.x * this.speed * speedMultiplier;
+    this.velocity.y = movement.y * this.speed * speedMultiplier;
 
     this.position.x += this.velocity.x * deltaTime;
     this.position.y += this.velocity.y * deltaTime;
@@ -138,6 +141,7 @@ export class Player {
   tryDash(input) {
     const dashConfig = GameConfig.player.dash;
 
+    // Shift/Space: short burst in move direction, or toward aim if standing still.
     if (this.dashCooldown > 0 || this.dashDuration > 0 || this.isDead) {
       return false;
     }

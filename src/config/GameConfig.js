@@ -83,6 +83,7 @@ export const GameConfig = {
     },
   },
   enemies: {
+    // Active spawn roster: see src/config/EnemyRoster.md (slime + skeletonCaptain boss only).
     slime: {
       name: "Inkling",
       maxHealth: 28,
@@ -302,13 +303,37 @@ export const GameConfig = {
     warmupIntervalMultiplier: 1.6,
   },
   bosses: {
+    // Skeleton Captain only — see src/config/EnemyRoster.md and BossDirector.js
     firstSpawnTime: 120,
     spawnInterval: 120,
     spawnChance: 1,
     healthScalePerSpawn: 0.12,
     announcementDuration: 2.8,
     defeatAnnouncementDuration: 2.4,
-    types: ["skeletonCaptain"],
+    activeType: "skeletonCaptain",
+    bonusXpOrbs: 6,
+    firstKillGuaranteedChest: true,
+  },
+  traits: {
+    // Run Traits: build-defining upgrades. See src/config/TraitDefinitions.js.
+    maxTraits: 4,
+    appearWeight: 0.5,
+    arcaneOverflowHits: 12,
+    arcaneOverflowRadius: 150,
+    arcaneOverflowDamage: 14,
+  },
+  synergies: {
+    // Cross-weapon synergies. See src/config/SynergyDefinitions.js.
+    appearWeight: 0.75,
+  },
+  eliteModifiers: {
+    // Behavior modifiers for normal enemies. See src/config/EnemyModifiers.js.
+    firstSpawnTime: 75,
+    baseChance: 0.06,
+    chancePerMinute: 0.03,
+    maxChance: 0.28,
+    xpReward: "green",
+    maxModifiedEnemies: 22,
   },
   chests: {
     pickupRadius: 40,

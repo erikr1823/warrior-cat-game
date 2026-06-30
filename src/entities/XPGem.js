@@ -35,6 +35,7 @@ export class XPGem {
     if (distance <= player.pickupRadius) {
       player.addXP(this.value, game);
       game.feedback.onXPCollect(this.position.x, this.position.y, this.tier);
+      game.synergySystem?.onXPCollected();
       this.isDead = true;
     }
   }

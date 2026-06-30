@@ -237,6 +237,17 @@ export class Renderer {
         ctx.drawImage(sprite, 0, 0, sourceSize, sourceSize, screen.x - halfSize, screen.y - halfSize, size, size);
       }
 
+      if (enemy.isEliteModified) {
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.strokeStyle = enemy.modifierColor ?? "#ffe09a";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, enemy.collisionRadius + 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       if (enemy.hitFlashTime > 0) {
         const flashStrength = clamp(enemy.hitFlashTime / GameConfig.enemies.hitFlashTime, 0, 1);
         ctx.fillStyle = `rgba(255, 255, 255, ${0.22 + flashStrength * 0.42})`;
@@ -393,6 +404,67 @@ export class Renderer {
       this.drawCenteredSprite(ctx, sprite, screenPosition.x, screenPosition.y, visualSize);
       ctx.restore();
     }
+  }
+
+  // Telegraphed ground hazards: a growing warning ring, then a brief flash.
+  drawHazards(hazards, camera) {
+    if (!hazards || hazards.length === 0) {
+      return;
+    }
+
+    const ctx = this.context;
+    ctx.save();
+
+    for (const hazard of hazards) {
+      const screenPosition = camera.worldToScreen(hazard);
+
+      if (!hazard.exploded) {
+        const progress = clamp(1 - hazard.warnTime / hazard.warnMax, 0, 1);
+        ctx.globalAlpha = 0.25 + progress * 0.35;
+        ctx.fillStyle = hazard.color ?? "#ff8a4a";
+        ctx.beginPath();
+        ctx.arc(screenPosition.x, screenPosition.y, hazard.radius * progress, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.7;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = hazard.color ?? "#ff8a4a";
+        ctx.beginPath();
+        ctx.arc(screenPosition.x, screenPosition.y, hazard.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.globalAlpha = clamp(hazard.flashTime / 0.18, 0, 1) * 0.8;
+        ctx.fillStyle = "#fff3d0";
+        ctx.beginPath();
+        ctx.arc(screenPosition.x, screenPosition.y, hazard.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  drawEnemyProjectiles(projectiles, camera) {
+    if (!projectiles || projectiles.length === 0) {
+      return;
+    }
+
+    const ctx = this.context;
+    ctx.save();
+
+    for (const projectile of projectiles) {
+      const screenPosition = camera.worldToScreen(projectile);
+      ctx.fillStyle = projectile.color ?? "#b06cff";
+      ctx.beginPath();
+      ctx.arc(screenPosition.x, screenPosition.y, projectile.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.arc(screenPosition.x, screenPosition.y, projectile.radius + 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
   }
 
   drawXPGems(xpGems, camera) {

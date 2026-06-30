@@ -1,10 +1,11 @@
 import { getGodModeStatusLabel, normalizeGodModeCommand } from "../debug/GodMode.js";
 
 export class DebugChatSystem {
-  constructor(context, width, height) {
+  constructor(context, width, height, enabled = false) {
     this.context = context;
     this.width = width;
     this.height = height;
+    this.enabled = enabled;
     this.open = false;
     this.text = "";
     this.status = "";
@@ -23,6 +24,10 @@ export class DebugChatSystem {
   }
 
   openChat(game) {
+    if (!this.enabled) {
+      return;
+    }
+
     this.open = true;
     this.activeGame = game;
     this.text = "";
@@ -78,7 +83,7 @@ export class DebugChatSystem {
   }
 
   submitCommand(game, rawCommand) {
-    if (!game) {
+    if (!this.enabled || !game) {
       this.status = "Command failed";
       this.closeChat();
       return;
@@ -121,10 +126,21 @@ export class DebugChatSystem {
       return;
     }
 
+    if (command === "death" || command === "kill" || command === "die") {
+      game.killPlayerByDebug();
+      this.status = "";
+      this.closeChat();
+      return;
+    }
+
     this.status = command ? `Unknown: ${command}` : "";
   }
 
   update(game, input) {
+    if (!this.enabled) {
+      return false;
+    }
+
     if (this.open) {
       return true;
     }
@@ -141,6 +157,10 @@ export class DebugChatSystem {
   }
 
   draw(game) {
+    if (!this.enabled) {
+      return;
+    }
+
     if (game.state !== "playing" && game.state !== "paused") {
       return;
     }
@@ -189,7 +209,7 @@ export class DebugChatSystem {
 
     ctx.fillStyle = "#b8f0b8";
     ctx.font = "600 16px system-ui, sans-serif";
-    ctx.fillText("Debug — godmode, godmode off", panelX + 12, panelY + 10);
+    ctx.fillText("Debug — godmode, godmode off, death", panelX + 12, panelY + 10);
     ctx.fillText("godmodex2 · godmodex5 · godmodex10", panelX + 12, panelY + 28);
 
     ctx.fillStyle = "#fff4dc";

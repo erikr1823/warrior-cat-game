@@ -9,6 +9,7 @@ export class Input {
     this.justPressedKeys = new Set();
     this.mousePosition = { x: 0, y: 0 };
     this.mouseClicked = false;
+    this.clickFramesRemaining = 0;
     this.pointerHeld = false;
     this.lastAimDirection = { x: 1, y: 0 };
     this.touch = new TouchControls(GameConfig.resolution.width, GameConfig.resolution.height);
@@ -39,7 +40,7 @@ export class Input {
 
     canvas.addEventListener("mousedown", (event) => {
       this.mousePosition = this.getCanvasPoint(event);
-      this.mouseClicked = true;
+      this.registerClick();
       this.pointerHeld = true;
     });
 
@@ -113,7 +114,14 @@ export class Input {
     }
 
     this.mousePosition = { x: tap.x, y: tap.y };
+    this.registerClick();
+  }
+
+  // A click stays valid for a couple of frames so it is never dropped due to
+  // frame-timing (e.g. a state transition on the same frame the click lands).
+  registerClick() {
     this.mouseClicked = true;
+    this.clickFramesRemaining = 2;
   }
 
   isTouchEnabled() {
@@ -156,6 +164,7 @@ export class Input {
     );
   }
 
+  /** Screen mouse position → world aim vector from the player (desktop aiming). */
   getWorldAimDirection(playerPosition, camera) {
     if (!this.isMouseInCanvas()) {
       return {
@@ -189,6 +198,7 @@ export class Input {
   }
 
   consumeManualShootClick() {
+    // Left click manual shot; blocked over touch UI zones.
     if (!this.mouseClicked) {
       return false;
     }
@@ -282,11 +292,11 @@ export class Input {
     const wasClicked = this.mouseClicked;
 
     if (wasClicked && this.shouldBlockTapAt(this.mousePosition)) {
-      this.mouseClicked = false;
+      this.clearClick();
       return false;
     }
 
-    this.mouseClicked = false;
+    this.clearClick();
     return wasClicked;
   }
 
@@ -296,12 +306,24 @@ export class Input {
     }
 
     const wasClicked = this.mouseClicked;
-    this.mouseClicked = false;
+    this.clearClick();
     return wasClicked;
   }
 
-  endFrame() {
+  clearClick() {
     this.mouseClicked = false;
+    this.clickFramesRemaining = 0;
+  }
+
+  endFrame() {
+    if (this.mouseClicked) {
+      this.clickFramesRemaining -= 1;
+
+      if (this.clickFramesRemaining <= 0) {
+        this.mouseClicked = false;
+      }
+    }
+
     this.justPressedKeys.clear();
   }
 

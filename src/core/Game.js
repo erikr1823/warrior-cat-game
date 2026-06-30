@@ -13,6 +13,9 @@ import { PassiveSystem } from "../systems/PassiveSystem.js";
 import { UpgradeSystem } from "../systems/UpgradeSystem.js";
 import { WeaponSystem } from "../systems/WeaponSystem.js";
 import { ChestRewardSystem } from "../systems/ChestRewardSystem.js";
+import { TraitSystem } from "../systems/TraitSystem.js";
+import { SynergySystem } from "../systems/SynergySystem.js";
+import { HazardSystem } from "../systems/HazardSystem.js";
 import { SaveSystem } from "../systems/SaveSystem.js";
 import { MetaUpgradeSystem } from "../systems/MetaUpgradeSystem.js";
 import { ShopSystem } from "../systems/ShopSystem.js";
@@ -25,7 +28,9 @@ import { ProjectilePool } from "../systems/ProjectilePool.js";
 import { removeDeadInPlace } from "./EntityCleanup.js";
 import { BiomeAmbienceSystem } from "../systems/BiomeAmbienceSystem.js";
 import { DebugChatSystem } from "../systems/DebugChatSystem.js";
+import { LeaderboardSystem } from "../systems/LeaderboardSystem.js";
 import { applyGodModeToPlayer } from "../debug/GodMode.js";
+import { isDebugEnabled } from "../debug/debugEnabled.js";
 import { preloadEnemyArt } from "../assets/EnemyVisuals.js";
 
 export class Game {
@@ -55,17 +60,24 @@ export class Game {
     this.ui = new UISystem(this.context, this.width, this.height);
     this.worldMap = new WorldMap();
     this.biomeAmbience = new BiomeAmbienceSystem(this.width, this.height);
-    this.debugChat = new DebugChatSystem(this.context, this.width, this.height);
+    this.debugEnabled = isDebugEnabled();
+    this.debugChat = new DebugChatSystem(this.context, this.width, this.height, this.debugEnabled);
     this.godMode = false;
     this.timeScale = 1;
     this.feedback = new FeedbackSystem(this);
     this.projectilePool = new ProjectilePool();
     this.runSummary = null;
+
+    this.leaderboard = new LeaderboardSystem();
+    this.leaderboardView = this.createLeaderboardView();
+    this.nameCaptureHandler = null;
+    this.menu.leaderboard = this.leaderboard;
     this.resetRun();
   }
 
   async initialize() {
     preloadEnemyArt();
+    this.leaderboard.prefetch();
     await this.worldMap.load();
   }
 
@@ -148,12 +160,25 @@ export class Game {
     this.updateScreenShake(deltaTime);
     this.feedback.update(deltaTime);
 
-    if (this.input.isRestartPressed() || this.ui.consumeGameOverRestartClick(this.input)) {
+    if (!this.input.consumeClick()) {
+      return;
+    }
+
+    const ui = this.ui;
+
+    if (ui.gameOverSubmitButton && this.input.isMouseOver(ui.gameOverSubmitButton)) {
+      this.submitLeaderboardScore();
+      return;
+    }
+
+    if (ui.gameOverRestartButton && this.input.isMouseOver(ui.gameOverRestartButton)) {
+      this.stopNameCapture();
       this.startRun();
       return;
     }
 
-    if (this.input.wasActionJustPressed() || this.ui.consumeGameOverShopClick(this.input)) {
+    if (ui.gameOverShopButton && this.input.isMouseOver(ui.gameOverShopButton)) {
+      this.stopNameCapture();
       this.state = "shop";
     }
   }
@@ -173,7 +198,7 @@ export class Game {
   updatePaused() {
     this.syncGodMode();
 
-    if (this.debugChat.update(this, this.input)) {
+    if (this.debugEnabled && this.debugChat.update(this, this.input)) {
       return;
     }
 
@@ -263,7 +288,7 @@ export class Game {
   update(deltaTime) {
     this.syncGodMode();
 
-    if (this.debugChat.update(this, this.input)) {
+    if (this.debugEnabled && this.debugChat.update(this, this.input)) {
       return;
     }
 
@@ -276,6 +301,8 @@ export class Game {
     this.survivalTime += step;
     this.updateScreenShake(step);
     this.feedback.update(step);
+
+    // Player mechanics: mouse/touch aim, dash (Shift/Space), manual Ink Flick (left click / touch action).
     const aim = this.input.getWorldAimDirection(this.player.position, this.camera);
     this.player.aimDirection = aim.direction;
 
@@ -298,8 +325,12 @@ export class Game {
     this.spawner.update(step, this);
 
     for (const enemy of this.enemies) {
-      enemy.update(step, this.player);
+      enemy.update(step, this.player, this);
     }
+
+    this.traitSystem.update(step, this);
+    this.synergySystem.update(step);
+    this.hazardSystem.update(step, this);
 
     for (const projectile of this.projectiles) {
       projectile.update(step);
@@ -390,7 +421,9 @@ export class Game {
     this.renderer.drawXPGems(this.xpGems, this.camera);
     this.renderer.drawCoinPickups(this.coinPickups, this.camera);
     this.renderer.drawChests(this.chests, this.camera);
+    this.renderer.drawHazards(this.hazardSystem.hazards, this.camera);
     this.renderer.drawEnemies(this.enemies, this.camera);
+    this.renderer.drawEnemyProjectiles(this.hazardSystem.projectiles, this.camera);
     this.renderer.drawPlayer(this.player, this.camera);
     if (this.state === "playing") {
       this.renderer.drawAimIndicator(
@@ -444,7 +477,7 @@ export class Game {
     }
 
     if (this.state === "gameOver") {
-      this.ui.drawGameOver(this.runSummary);
+      this.ui.drawGameOver(this.runSummary, this.leaderboardView);
     }
 
     if (this.state === "paused") {
@@ -456,7 +489,9 @@ export class Game {
       this.player.maxHealth,
       this.feedback.getLowHealthPulse(),
     );
-    this.debugChat.draw(this);
+    if (this.debugEnabled) {
+      this.debugChat.draw(this);
+    }
     this.input.drawTouchControls(this.context, this.state);
   }
 
@@ -470,8 +505,8 @@ export class Game {
   }
 
   resetRun() {
-    const keepGodMode = this.godMode;
-    const keepTimeScale = this.timeScale;
+    const keepGodMode = this.debugEnabled && this.godMode;
+    const keepTimeScale = keepGodMode ? this.timeScale : 1;
     this.survivalTime = 0;
     this.killCount = 0;
     this.bossDefeatedCount = 0;
@@ -506,13 +541,35 @@ export class Game {
     this.collisionSystem = new CollisionSystem();
     this.upgradeSystem = new UpgradeSystem();
     this.chestRewardSystem = new ChestRewardSystem();
+    this.traitSystem = new TraitSystem();
+    this.synergySystem = new SynergySystem();
+    this.hazardSystem = new HazardSystem();
     this.metaUpgradeSystem.applyToRun(this);
     applyCharacterToRun(this);
     this.camera.follow(this.player.position);
     this.syncGodMode();
   }
 
+  killPlayerByDebug() {
+    if (!this.debugEnabled || this.state !== "playing") {
+      return;
+    }
+
+    this.godMode = false;
+    this.timeScale = 1;
+    this.syncGodMode();
+    this.player.godMode = false;
+    this.player.invincibilityTime = 0;
+    this.player.health = 0;
+    this.player.isDead = true;
+    this.endRun();
+  }
+
   setGodMode(enabled, timeScale = 1) {
+    if (!this.debugEnabled) {
+      return;
+    }
+
     this.godMode = Boolean(enabled);
     this.timeScale = enabled ? timeScale : 1;
     this.syncGodMode();
@@ -534,7 +591,15 @@ export class Game {
       return;
     }
 
-    this.chestReward = this.chestRewardSystem.rollReward(this);
+    // Blood Price trait: stronger rewards, but opening costs HP unless already low.
+    const bloodPrice = this.traitSystem?.hasBloodPrice() ?? false;
+
+    if (bloodPrice && this.player.health > this.player.maxHealth * 0.35) {
+      const cost = Math.round(this.player.maxHealth * 0.12);
+      this.player.health = Math.max(1, this.player.health - cost);
+    }
+
+    this.chestReward = this.chestRewardSystem.rollReward(this, { bloodPrice });
     this.chestAnimation = { time: 0 };
     this.feedback.onChestOpen();
     this.state = "chestReward";
@@ -565,6 +630,147 @@ export class Game {
 
     this.feedback.onGameOver();
     this.state = "gameOver";
+    this.beginLeaderboardFlow();
+  }
+
+  createLeaderboardView() {
+    const savedName = this.saveData?.settings?.playerName ?? "";
+
+    return {
+      configured: false,
+      name: typeof savedName === "string" ? savedName : "",
+      status: "",
+      statusError: false,
+      submitted: false,
+      submitting: false,
+      loading: false,
+      loadError: false,
+      entries: [],
+    };
+  }
+
+  beginLeaderboardFlow() {
+    this.leaderboardView = this.createLeaderboardView();
+    this.leaderboardView.configured = this.leaderboard.isConfigured();
+
+    if (!this.leaderboardView.configured) {
+      this.leaderboardView.status = "Leaderboard not configured yet";
+      return;
+    }
+
+    this.startNameCapture();
+    this.refreshLeaderboard();
+  }
+
+  startNameCapture() {
+    if (this.nameCaptureHandler) {
+      return;
+    }
+
+    this.nameCaptureHandler = (event) => this.handleNameKey(event);
+    window.addEventListener("keydown", this.nameCaptureHandler, true);
+  }
+
+  stopNameCapture() {
+    if (!this.nameCaptureHandler) {
+      return;
+    }
+
+    window.removeEventListener("keydown", this.nameCaptureHandler, true);
+    this.nameCaptureHandler = null;
+  }
+
+  handleNameKey(event) {
+    if (this.state !== "gameOver" || this.leaderboardView.submitted) {
+      return;
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.submitLeaderboardScore();
+      return;
+    }
+
+    if (event.key === "Backspace") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.leaderboardView.name = this.leaderboardView.name.slice(0, -1);
+      return;
+    }
+
+    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (this.leaderboardView.name.length < 12) {
+        this.leaderboardView.name += event.key;
+      }
+    }
+  }
+
+  async refreshLeaderboard() {
+    const view = this.leaderboardView;
+    view.loading = true;
+    view.loadError = false;
+
+    const result = await this.leaderboard.getTopScores(10);
+
+    if (this.leaderboardView !== view) {
+      return;
+    }
+
+    view.loading = false;
+
+    if (result.ok) {
+      view.entries = result.scores;
+    } else if (result.reason !== "not_configured") {
+      view.loadError = true;
+    }
+  }
+
+  async submitLeaderboardScore() {
+    const view = this.leaderboardView;
+
+    if (!view.configured || view.submitting || view.submitted || !this.runSummary) {
+      return;
+    }
+
+    const score = this.leaderboard.buildScoreRow(this.runSummary, view.name);
+
+    if (!this.leaderboard.validateScore(score)) {
+      view.status = "Survive at least 10s to submit";
+      view.statusError = true;
+      return;
+    }
+
+    view.submitting = true;
+    view.status = "Submitting...";
+    view.statusError = false;
+
+    // Persist the cleaned name so it is remembered next time.
+    this.saveData.settings = { ...this.saveData.settings, playerName: score.player_name };
+    this.saveSystem.save(this.saveData);
+
+    const result = await this.leaderboard.submitScore(score);
+
+    if (this.leaderboardView !== view) {
+      return;
+    }
+
+    view.submitting = false;
+
+    if (result.ok) {
+      view.submitted = true;
+      view.name = score.player_name;
+      view.status = "Score submitted!";
+      view.statusError = false;
+      this.stopNameCapture();
+      this.refreshLeaderboard();
+    } else {
+      view.status = "Could not submit score";
+      view.statusError = true;
+    }
   }
 
   processLevelUps() {

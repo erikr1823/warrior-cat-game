@@ -11,6 +11,7 @@ export class UISystem {
     this.chestContinueButton = null;
     this.gameOverShopButton = null;
     this.gameOverRestartButton = null;
+    this.gameOverSubmitButton = null;
     this.pauseButton = {
       x: width - 164,
       y: 28,
@@ -30,6 +31,12 @@ export class UISystem {
       height: 44,
     };
     this.volumeDragging = false;
+    this.playerStatusCard = {
+      x: 28,
+      y: 28,
+      width: 248,
+      height: 104,
+    };
   }
 
   draw({
@@ -64,27 +71,13 @@ export class UISystem {
     ctx.save();
     ctx.textBaseline = "top";
 
-    const panelHeight = 248;
-    ctx.fillStyle = "rgba(10, 14, 18, 0.58)";
-    ctx.fillRect(32, 28, 470, panelHeight);
-
-    ctx.strokeStyle = "rgba(255, 222, 161, 0.32)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(32, 28, 470, panelHeight);
-
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "700 42px system-ui, sans-serif";
-    ctx.fillText(title, 56, 50);
-
-    ctx.fillStyle = "#d9e8e2";
-    ctx.font = "500 24px system-ui, sans-serif";
-    ctx.fillText(`FPS: ${Math.round(fps)}`, 56, 108);
-    ctx.fillText(`Time: ${formatTime(survivalTime)}`, 56, 142);
-    ctx.fillText(`Kills: ${killCount}`, 56, 176);
-    ctx.fillText(`Enemies: ${enemyCount}`, 240, 176);
-    ctx.fillText(`${GameIdentity.memoryCoinLabel}: ${coins}`, 360, 176);
-    this.drawPlayerHealthBar(playerHealth, playerMaxHealth, 56, 210, 390, 26);
-
+    this.drawPlayerStatusCard({
+      playerHealth,
+      playerMaxHealth,
+      survivalTime,
+      killCount,
+      coins,
+    });
     this.drawLoadoutPanel(weapons, passives);
     this.drawWaveInfo(wave);
     this.drawWaveAnnouncement(waveAnnouncement);
@@ -104,29 +97,66 @@ export class UISystem {
     ctx.restore();
   }
 
+  drawPlayerStatusCard({ playerHealth, playerMaxHealth, survivalTime, killCount, coins }) {
+    const ctx = this.context;
+    const card = this.playerStatusCard;
+    const pad = 14;
+    const barY = card.y + pad;
+    const barWidth = card.width - pad * 2;
+    const barHeight = 18;
+    const statsY = barY + barHeight + 10;
+
+    ctx.fillStyle = "rgba(8, 10, 14, 0.78)";
+    ctx.fillRect(card.x, card.y, card.width, card.height);
+    ctx.strokeStyle = "rgba(255, 222, 161, 0.22)";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(card.x + 0.5, card.y + 0.5, card.width - 1, card.height - 1);
+
+    this.drawPlayerHealthBar(
+      playerHealth,
+      playerMaxHealth,
+      card.x + pad,
+      barY,
+      barWidth,
+      barHeight,
+    );
+
+    ctx.font = "600 17px system-ui, sans-serif";
+    ctx.fillStyle = "#d9e8e2";
+    ctx.fillText(`Time ${formatTime(survivalTime)}`, card.x + pad, statsY);
+
+    const killsLabel = `Kills ${killCount}`;
+    const coinsLabel = `${GameIdentity.memoryCoinLabel} ${coins}`;
+    ctx.fillText(killsLabel, card.x + pad, statsY + 24);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#ffe09a";
+    ctx.fillText(coinsLabel, card.x + card.width - pad, statsY + 24);
+    ctx.textAlign = "left";
+  }
+
   drawPerfStats({ fps, enemyCount, projectileCount, particleCount, pickupCount }) {
     const ctx = this.context;
-    const panelX = 32;
-    const panelY = 286;
-    const panelWidth = 470;
-    const panelHeight = 118;
-
-    ctx.fillStyle = "rgba(10, 14, 18, 0.58)";
+    const card = this.playerStatusCard;
+    const panelX = card.x;
+    const panelY = card.y + card.height + 14;
+    const panelWidth = card.width;
+    const panelHeight = 108;
+    ctx.fillStyle = "rgba(8, 10, 14, 0.72)";
     ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-    ctx.strokeStyle = "rgba(255, 222, 161, 0.22)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+    ctx.strokeStyle = "rgba(255, 222, 161, 0.18)";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(panelX + 0.5, panelY + 0.5, panelWidth - 1, panelHeight - 1);
 
-    ctx.fillStyle = "#9eb0aa";
-    ctx.font = "600 18px system-ui, sans-serif";
-    ctx.fillText("PERFORMANCE", panelX + 16, panelY + 12);
-    ctx.font = "500 20px system-ui, sans-serif";
-    ctx.fillStyle = "#d9e8e2";
-    ctx.fillText(`FPS ${Math.round(fps)}`, panelX + 16, panelY + 42);
-    ctx.fillText(`Enemies ${enemyCount}`, panelX + 150, panelY + 42);
-    ctx.fillText(`Projectiles ${projectileCount}`, panelX + 300, panelY + 42);
-    ctx.fillText(`Particles ${particleCount}`, panelX + 16, panelY + 72);
-    ctx.fillText(`Pickups ${pickupCount}`, panelX + 180, panelY + 72);
+    ctx.fillStyle = "#8a9a94";
+    ctx.font = "600 14px system-ui, sans-serif";
+    ctx.fillText("PERFORMANCE", panelX + 12, panelY + 10);
+    ctx.font = "500 16px system-ui, sans-serif";
+    ctx.fillStyle = "#b8c8c2";
+    ctx.fillText(`FPS ${Math.round(fps)}`, panelX + 12, panelY + 34);
+    ctx.fillText(`Enemies ${enemyCount}`, panelX + 12, panelY + 56);
+    ctx.fillText(`Projectiles ${projectileCount}`, panelX + 12, panelY + 78);
+    ctx.fillText(`Particles ${particleCount}`, panelX + 130, panelY + 34);
+    ctx.fillText(`Pickups ${pickupCount}`, panelX + 130, panelY + 56);
   }
 
   drawPauseButton() {
@@ -421,11 +451,11 @@ export class UISystem {
     ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
     ctx.fillRect(x, y, width * percent, 7);
 
-    ctx.font = "700 18px system-ui, sans-serif";
+    ctx.font = "700 15px system-ui, sans-serif";
     ctx.fillStyle = "#101318";
-    ctx.fillText(hpText, x + 12, y + 4);
-    ctx.fillStyle = "#fff4dc";
     ctx.fillText(hpText, x + 10, y + 2);
+    ctx.fillStyle = "#fff4dc";
+    ctx.fillText(hpText, x + 8, y);
   }
 
   drawXPBar(level, xp, xpToNextLevel) {
@@ -542,11 +572,13 @@ export class UISystem {
     const ctx = this.context;
     const rankText = getUpgradeRankText(choice);
     const categoryText = getUpgradeCategoryText(choice);
+    const accentColor = getUpgradeAccentColor(choice);
+    const isSpecial = choice.type === "trait" || choice.type === "synergy";
 
     ctx.fillStyle = "#211d22";
     ctx.fillRect(card.x, card.y, card.width, card.height);
-    ctx.strokeStyle = "#c8914d";
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = isSpecial ? 5 : 4;
     ctx.strokeRect(card.x, card.y, card.width, card.height);
 
     ctx.fillStyle = "#3a2c2b";
@@ -559,7 +591,7 @@ export class UISystem {
     ctx.fillText(String(index + 1), card.x + 47, card.y + 27);
 
     ctx.textAlign = "left";
-    ctx.fillStyle = "#9eb0aa";
+    ctx.fillStyle = isSpecial ? accentColor : "#9eb0aa";
     ctx.font = "700 18px 'Courier New', monospace";
     ctx.fillText(categoryText, card.x + 96, card.y + 22);
 
@@ -782,7 +814,15 @@ export class UISystem {
     return input.isMouseOver(this.gameOverRestartButton);
   }
 
-  drawGameOver(summary) {
+  consumeGameOverSubmitClick(input) {
+    if (!this.gameOverSubmitButton || !input.consumeClick()) {
+      return false;
+    }
+
+    return input.isMouseOver(this.gameOverSubmitButton);
+  }
+
+  drawGameOver(summary, leaderboard = {}) {
     if (!summary) {
       return;
     }
@@ -807,94 +847,84 @@ export class UISystem {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 68px 'Courier New', monospace";
-    ctx.fillText("PATROL ENDED", centerX, panelY + 28);
+    ctx.font = "900 60px 'Courier New', monospace";
+    ctx.fillText("PATROL ENDED", centerX, panelY + 24);
 
-    ctx.font = "600 22px 'Courier New', monospace";
-    ctx.fillStyle = "#9eb0aa";
-    ctx.textAlign = "left";
-    this.drawWrappedText(
-      GameIdentity.storyPremise,
-      panelX + 60,
-      panelY + 96,
-      panelWidth - 120,
-      28,
-    );
+    const leftX = panelX + 70;
+    const rightX = panelX + panelWidth / 2 + 30;
+    let rowY = panelY + 116;
 
-    ctx.font = "700 28px 'Courier New', monospace";
-    ctx.fillStyle = "#d9e8e2";
-
-    const leftX = panelX + 80;
-    const rightX = panelX + panelWidth / 2 + 40;
-    let rowY = panelY + 200;
-
+    // --- Left column: run summary + loadout ---
     this.drawSummaryLine(leftX, rowY, `Survival Time: ${formatTime(summary.survivalTime)}`);
-    rowY += 42;
+    rowY += 40;
     this.drawSummaryLine(leftX, rowY, `Level Reached: ${summary.finalLevel}`);
-    rowY += 42;
+    rowY += 40;
     this.drawSummaryLine(leftX, rowY, `Unwritten Vanquished: ${summary.killCount}`);
-    rowY += 42;
+    rowY += 40;
     this.drawSummaryLine(leftX, rowY, `Archivores Defeated: ${summary.bossDefeatedCount}`);
-    rowY += 42;
+    rowY += 40;
     this.drawSummaryLine(leftX, rowY, `Memory Coins Earned: ${summary.coinsEarned}`);
 
     if (summary.startingCoinBonus > 0) {
-      rowY += 42;
+      rowY += 40;
       this.drawSummaryLine(leftX, rowY, `Starting Bonus: +${summary.startingCoinBonus}`);
     }
 
-    rowY += 42;
+    rowY += 40;
     this.drawSummaryLine(leftX, rowY, `Total Memory Coins: ${summary.totalCoins}`, "#ffe09a");
 
-    rowY = panelY + 200;
+    rowY += 56;
     ctx.textAlign = "left";
     ctx.fillStyle = "#fff4dc";
-    ctx.font = "800 28px 'Courier New', monospace";
-    ctx.fillText("Tools Carried", rightX, rowY);
-    rowY += 40;
-    ctx.font = "700 24px 'Courier New', monospace";
+    ctx.font = "800 26px 'Courier New', monospace";
+    ctx.fillText("Tools Carried", leftX, rowY);
+    rowY += 36;
+    ctx.font = "700 22px 'Courier New', monospace";
     ctx.fillStyle = "#d9e8e2";
 
     if (summary.weapons.length === 0) {
-      ctx.fillText("None", rightX, rowY);
-      rowY += 34;
+      ctx.fillText("None", leftX, rowY);
+      rowY += 30;
     } else {
       for (const weaponName of summary.weapons) {
-        ctx.fillText(`• ${weaponName}`, rightX, rowY);
-        rowY += 34;
+        ctx.fillText(`• ${weaponName}`, leftX, rowY);
+        rowY += 30;
       }
     }
 
-    rowY += 12;
+    rowY += 14;
     ctx.fillStyle = "#fff4dc";
-    ctx.font = "800 28px 'Courier New', monospace";
-    ctx.fillText("Tales Rewritten", rightX, rowY);
-    rowY += 40;
-    ctx.font = "700 24px 'Courier New', monospace";
+    ctx.font = "800 26px 'Courier New', monospace";
+    ctx.fillText("Tales Rewritten", leftX, rowY);
+    rowY += 36;
+    ctx.font = "700 22px 'Courier New', monospace";
     ctx.fillStyle = "#d9e8e2";
 
     if (summary.evolutions.length === 0) {
-      ctx.fillText("None this run", rightX, rowY);
+      ctx.fillText("None this run", leftX, rowY);
     } else {
       for (const evolutionName of summary.evolutions) {
-        ctx.fillText(`• ${evolutionName}`, rightX, rowY);
-        rowY += 34;
+        ctx.fillText(`• ${evolutionName}`, leftX, rowY);
+        rowY += 30;
       }
     }
 
+    // --- Right column: leaderboard ---
+    this.drawLeaderboardColumn(rightX, panelY + 116, panelX + panelWidth - 40, leaderboard);
+
     const shopButton = {
       x: centerX - 430,
-      y: panelY + panelHeight - 110,
+      y: panelY + panelHeight - 100,
       width: 380,
-      height: 72,
+      height: 68,
       label: "BACK TO BUREAU",
     };
     const restartButton = {
       x: centerX + 50,
-      y: panelY + panelHeight - 110,
+      y: panelY + panelHeight - 100,
       width: 380,
-      height: 72,
-      label: "BEGIN PATROL",
+      height: 68,
+      label: "PLAY AGAIN",
     };
 
     this.gameOverShopButton = shopButton;
@@ -904,10 +934,125 @@ export class UISystem {
     this.drawSummaryActionButton(restartButton, "#4a7058");
 
     ctx.fillStyle = "#ffe09a";
-    ctx.font = "800 24px 'Courier New', monospace";
+    ctx.font = "700 20px 'Courier New', monospace";
     ctx.textAlign = "center";
-    ctx.fillText("SPACE / BUREAU = UPGRADES   ·   R = INSTANT RESTART", centerX, panelY + panelHeight - 34);
+    ctx.fillText("Type your name, click SUBMIT, then PLAY AGAIN or BUREAU", centerX, panelY + panelHeight - 26);
     ctx.restore();
+  }
+
+  drawLeaderboardColumn(x, y, rightEdge, leaderboard) {
+    const ctx = this.context;
+    const width = rightEdge - x;
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "#fff4dc";
+    ctx.font = "800 28px 'Courier New', monospace";
+    ctx.fillText("GLOBAL LEADERBOARD", x, y);
+
+    let rowY = y + 44;
+
+    if (!leaderboard.configured) {
+      this.gameOverSubmitButton = null;
+      ctx.fillStyle = "#9eb0aa";
+      ctx.font = "600 20px 'Courier New', monospace";
+      ctx.fillText("Leaderboard not configured yet", x, rowY);
+      return;
+    }
+
+    // Name input field
+    ctx.fillStyle = "#9eb0aa";
+    ctx.font = "600 18px 'Courier New', monospace";
+    ctx.fillText("YOUR NAME", x, rowY);
+    rowY += 26;
+
+    const boxWidth = width - 160;
+    const boxHeight = 44;
+    ctx.fillStyle = "#0b0e14";
+    ctx.fillRect(x, rowY, boxWidth, boxHeight);
+    ctx.strokeStyle = leaderboard.submitted ? "rgba(90, 214, 111, 0.6)" : "rgba(255, 222, 161, 0.5)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, rowY, boxWidth, boxHeight);
+
+    ctx.fillStyle = "#fff4dc";
+    ctx.font = "700 24px 'Courier New', monospace";
+    const caret = Math.floor(Date.now() / 500) % 2 === 0 ? "_" : " ";
+    const nameText = (leaderboard.name ?? "").toUpperCase();
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${nameText}${leaderboard.submitted ? "" : caret}`, x + 12, rowY + boxHeight / 2);
+    ctx.textBaseline = "top";
+
+    const submitButton = {
+      x: x + boxWidth + 12,
+      y: rowY,
+      width: width - boxWidth - 12,
+      height: boxHeight,
+      label: leaderboard.submitted ? "DONE" : "SUBMIT",
+    };
+    this.gameOverSubmitButton = leaderboard.submitted ? null : submitButton;
+
+    ctx.fillStyle = leaderboard.submitted ? "#3a5044" : "#4a7058";
+    ctx.fillRect(submitButton.x, submitButton.y, submitButton.width, submitButton.height);
+    ctx.fillStyle = "#ffe09a";
+    ctx.font = "800 20px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(submitButton.label, submitButton.x + submitButton.width / 2, submitButton.y + submitButton.height / 2);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+
+    rowY += boxHeight + 8;
+
+    if (leaderboard.status) {
+      ctx.fillStyle = leaderboard.statusError ? "#ff8a72" : "#9ef59e";
+      ctx.font = "600 18px 'Courier New', monospace";
+      ctx.fillText(leaderboard.status, x, rowY);
+    }
+    rowY += 30;
+
+    // Top scores list
+    ctx.strokeStyle = "rgba(255, 222, 161, 0.18)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, rowY);
+    ctx.lineTo(rightEdge, rowY);
+    ctx.stroke();
+    rowY += 12;
+
+    const entries = leaderboard.entries ?? [];
+
+    if (leaderboard.loading) {
+      ctx.fillStyle = "#9eb0aa";
+      ctx.font = "600 20px 'Courier New', monospace";
+      ctx.fillText("Loading...", x, rowY);
+      return;
+    }
+
+    if (leaderboard.loadError) {
+      ctx.fillStyle = "#ff8a72";
+      ctx.font = "600 20px 'Courier New', monospace";
+      ctx.fillText("Could not load leaderboard", x, rowY);
+      return;
+    }
+
+    if (entries.length === 0) {
+      ctx.fillStyle = "#9eb0aa";
+      ctx.font = "600 20px 'Courier New', monospace";
+      ctx.fillText("No scores yet. Be the first!", x, rowY);
+      return;
+    }
+
+    ctx.font = "700 19px 'Courier New', monospace";
+
+    entries.slice(0, 10).forEach((entry, index) => {
+      const rank = `${index + 1}.`.padEnd(3, " ");
+      const name = String(entry.player_name ?? "Player").toUpperCase().slice(0, 12).padEnd(12, " ");
+      const time = formatTime(entry.survival_time ?? 0);
+      const line = `${rank}${name} ${time}  ${entry.kills ?? 0}k  Lv${entry.final_level ?? 1}`;
+      ctx.fillStyle = index === 0 ? "#ffe09a" : "#d9e8e2";
+      ctx.fillText(line, x, rowY);
+      rowY += 30;
+    });
   }
 
   drawSummaryLine(x, y, text, color = "#d9e8e2") {
@@ -957,6 +1102,14 @@ function getUpgradeRankText(choice) {
     return "Bonus reward";
   }
 
+  if (choice.type === "trait") {
+    return choice.tradeoff ? `Trait — ${choice.tradeoff}` : "Run Trait";
+  }
+
+  if (choice.type === "synergy") {
+    return "Synergy unlocked!";
+  }
+
   return "";
 }
 
@@ -969,5 +1122,26 @@ function getUpgradeCategoryText(choice) {
     return "RELIC";
   }
 
+  if (choice.type === "trait") {
+    return "TRAIT";
+  }
+
+  if (choice.type === "synergy") {
+    return "SYNERGY";
+  }
+
   return "BONUS";
+}
+
+// Distinct border color so Traits/Synergies feel special and rare.
+function getUpgradeAccentColor(choice) {
+  if (choice.type === "trait") {
+    return choice.color ?? "#ff9a5a";
+  }
+
+  if (choice.type === "synergy") {
+    return choice.color ?? "#7ec8ff";
+  }
+
+  return "#c8914d";
 }

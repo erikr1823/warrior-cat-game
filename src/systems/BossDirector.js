@@ -1,5 +1,9 @@
 import { GameConfig } from "../config/GameConfig.js";
 import { Enemy } from "../entities/Enemy.js";
+import { createBossController } from "./BossBehavior.js";
+
+/** Boss type for live spawns — must match GameConfig.bosses.activeType and EnemyRoster.md */
+const ACTIVE_BOSS_TYPE = GameConfig.bosses.activeType ?? "skeletonCaptain";
 
 export class BossDirector {
   constructor(spawner) {
@@ -24,6 +28,7 @@ export class BossDirector {
       }
     }
 
+    // Timed spawn: first at 120s, then every 120s. Wait if a boss is still alive.
     if (game.survivalTime < this.nextBossTime) {
       return;
     }
@@ -47,15 +52,13 @@ export class BossDirector {
     const healthMultiplier =
       waveDirector.getHealthMultiplier(game.survivalTime, game.bossDefeatedCount) *
       (1 + this.bossSpawnCount * GameConfig.bosses.healthScalePerSpawn);
-    const bossTypes = GameConfig.bosses.types ?? ["skeletonCaptain"];
-    const bossType = bossTypes[Math.floor(Math.random() * bossTypes.length)];
-    const bossConfig = GameConfig.enemies[bossType] ?? GameConfig.enemies.skeletonCaptain;
+    const bossConfig = GameConfig.enemies[ACTIVE_BOSS_TYPE] ?? GameConfig.enemies.slime;
 
     const spawnPosition = this.spawner.getSpawnPosition(game.player.position, game.camera);
     this.bossSpawnCount += 1;
 
     game.enemies.push(
-      new Enemy(spawnPosition.x, spawnPosition.y, bossType, {
+      new Enemy(spawnPosition.x, spawnPosition.y, ACTIVE_BOSS_TYPE, {
         healthMultiplier,
         bossIndex: this.bossSpawnCount,
         enemyPack: world.enemyPack,
@@ -64,7 +67,10 @@ export class BossDirector {
       }),
     );
 
-    game.enemies.at(-1).name = bossConfig.name;
+    const boss = game.enemies.at(-1);
+    boss.name = bossConfig.name;
+    // Telegraphed attack pattern (charge / slam / spread / summon / enrage).
+    boss.controller = createBossController();
 
     this.announcement = {
       text: `${bossConfig.name.toUpperCase()} APPROACHES`,

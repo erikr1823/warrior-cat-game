@@ -53,6 +53,7 @@ export class CollisionSystem {
 
         damageEnemy(game, enemy, projectile.damage, projectile.direction);
         projectile.hitEnemies.add(enemy);
+        this.maybeSplitIntoShards(game, projectile, enemy);
 
         if (projectile.pierce <= 0) {
           projectile.isDead = true;
@@ -61,6 +62,43 @@ export class CollisionSystem {
 
         projectile.pierce -= 1;
       }
+    }
+  }
+
+  // Synergy: Arcane Serration — ink projectiles can split into short blade shards
+  // on hit. Shards use the "blade" style so they cannot recursively split.
+  maybeSplitIntoShards(game, projectile, enemy) {
+    if (!game.synergySystem?.has("arcaneSerration")) {
+      return;
+    }
+
+    const isArcane = projectile.visualStyle === "arcane" || projectile.visualStyle === "storm";
+
+    if (!isArcane || Math.random() >= 0.25) {
+      return;
+    }
+
+    const shardDamage = Math.max(2, Math.round(projectile.damage * 0.4));
+    const angles = [-0.5, 0.5];
+
+    for (const angle of angles) {
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const direction = {
+        x: projectile.direction.x * cos - projectile.direction.y * sin,
+        y: projectile.direction.x * sin + projectile.direction.y * cos,
+      };
+
+      game.projectiles.push(
+        game.projectilePool.acquire(enemy.position.x, enemy.position.y, direction, {
+          damage: shardDamage,
+          speed: 620,
+          radius: 8,
+          maxDistance: 220,
+          pierce: 0,
+          visualStyle: "blade",
+        }),
+      );
     }
   }
 
@@ -83,6 +121,7 @@ export class CollisionSystem {
 
         if (tookDamage) {
           game.feedback.onPlayerDamage();
+          game.traitSystem?.onPlayerDamaged(game);
 
           if (game.player.isDead) {
             game.endRun();

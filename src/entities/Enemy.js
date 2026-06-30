@@ -1,6 +1,7 @@
 import { directionBetween } from "../core/MathUtils.js";
 import { GameConfig } from "../config/GameConfig.js";
 import { getEnemyVisualSet, getEnemyRenderSize } from "../assets/EnemyVisuals.js";
+import { updateEnemyModifier } from "../config/EnemyModifiers.js";
 
 export class Enemy {
   constructor(x, y, type = "slime", modifiers = {}) {
@@ -32,6 +33,19 @@ export class Enemy {
     this.bossIndex = modifiers.bossIndex ?? 1;
     this.spriteSet = getEnemyVisualSet(visualType, enemyPack);
     this.facing = "down";
+
+    // Elite behavior modifier state (assigned by Spawner via applyEnemyModifier).
+    this.modifier = null;
+    this.isEliteModified = false;
+    this.modifierColor = null;
+    this.modifierState = null;
+    this.damageTakenMultiplier = 1;
+    this.isSplitChild = false;
+    this.staticMark = 0;
+
+    // Optional behavior function (deltaTime-driven). Used by bosses for
+    // telegraphed attack patterns. Returns true if it set velocity itself.
+    this.controller = null;
   }
 
   getCurrentSprite() {
@@ -47,11 +61,30 @@ export class Enemy {
     return spriteSet.frames[frameIndex];
   }
 
-  update(deltaTime, player) {
-    const direction = directionBetween(this.position, player.position);
+  update(deltaTime, player, game = null) {
+    let handledMovement = false;
 
-    this.velocity.x = direction.x * this.speed + this.knockbackVelocity.x;
-    this.velocity.y = direction.y * this.speed + this.knockbackVelocity.y;
+    if (this.modifier && game) {
+      handledMovement = updateEnemyModifier(this, deltaTime, player, game);
+    }
+
+    if (!handledMovement && this.controller && game) {
+      handledMovement = this.controller(this, deltaTime, player, game);
+    }
+
+    if (handledMovement) {
+      this.velocity.x += this.knockbackVelocity.x;
+      this.velocity.y += this.knockbackVelocity.y;
+    } else {
+      const direction = directionBetween(this.position, player.position);
+      this.velocity.x = direction.x * this.speed + this.knockbackVelocity.x;
+      this.velocity.y = direction.y * this.speed + this.knockbackVelocity.y;
+
+      if (Math.abs(direction.x) > 0.05 || Math.abs(direction.y) > 0.05) {
+        this.updateFacing(direction);
+      }
+    }
+
     this.position.x += this.velocity.x * deltaTime;
     this.position.y += this.velocity.y * deltaTime;
     this.knockbackVelocity.x *= Math.max(0, 1 - GameConfig.enemies.knockbackFriction * deltaTime);
@@ -59,8 +92,8 @@ export class Enemy {
     this.hitFlashTime = Math.max(0, this.hitFlashTime - deltaTime);
     this.animTime += deltaTime;
 
-    if (Math.abs(direction.x) > 0.05 || Math.abs(direction.y) > 0.05) {
-      this.updateFacing(direction);
+    if (this.staticMark > 0) {
+      this.staticMark = Math.max(0, this.staticMark - deltaTime);
     }
   }
 
