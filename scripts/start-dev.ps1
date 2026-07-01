@@ -52,4 +52,4 @@ Set-Location $root
 Start-Process $url
 Write-Host "Serving $root at $url"
 Write-Host "If the game looks broken, hard refresh the page (Ctrl+Shift+R)."
-python -m http.server $port
+python (Join-Path $PSScriptRoot "dev-server.py") $port

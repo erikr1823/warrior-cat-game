@@ -1,6 +1,16 @@
 import { clamp, formatTime } from "../core/MathUtils.js";
 import { GameConfig } from "../config/GameConfig.js";
 import { GameIdentity } from "../config/GameIdentity.js";
+import {
+  UITheme,
+  drawButton as drawThemeButton,
+  drawPanel,
+  drawProgressBar,
+  drawTextShadow,
+  drawTextOutline,
+  drawWrappedText as wrapThemeText,
+  getRarityColor,
+} from "../config/UITheme.js";
 
 export class UISystem {
   constructor(context, width, height) {
@@ -34,9 +44,10 @@ export class UISystem {
     this.playerStatusCard = {
       x: 28,
       y: 28,
-      width: 248,
-      height: 104,
+      width: 260,
+      height: 108,
     };
+    this.showPerfStats = false;
   }
 
   draw({
@@ -65,6 +76,7 @@ export class UISystem {
     particleCount = 0,
     pickupCount = 0,
     showPauseButton = true,
+    showPerfStats = false,
   }) {
     const ctx = this.context;
 
@@ -87,50 +99,55 @@ export class UISystem {
       this.drawPauseButton();
     }
     this.drawAudioControls(muted, volume);
-    this.drawPerfStats({
-      fps,
-      enemyCount,
-      projectileCount,
-      particleCount,
-      pickupCount,
-    });
+    if (showPerfStats) {
+      this.drawPerfStats({
+        fps,
+        enemyCount,
+        projectileCount,
+        particleCount,
+        pickupCount,
+      });
+    }
     ctx.restore();
   }
 
   drawPlayerStatusCard({ playerHealth, playerMaxHealth, survivalTime, killCount, coins }) {
     const ctx = this.context;
     const card = this.playerStatusCard;
-    const pad = 14;
+    const pad = UITheme.spacing.panelPad;
     const barY = card.y + pad;
     const barWidth = card.width - pad * 2;
-    const barHeight = 18;
-    const statsY = barY + barHeight + 10;
+    const barHeight = 20;
+    const statsY = barY + barHeight + 12;
 
-    ctx.fillStyle = "rgba(8, 10, 14, 0.78)";
-    ctx.fillRect(card.x, card.y, card.width, card.height);
-    ctx.strokeStyle = "rgba(255, 222, 161, 0.22)";
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(card.x + 0.5, card.y + 0.5, card.width - 1, card.height - 1);
+    drawPanel(ctx, card.x, card.y, card.width, card.height, {
+      fillStyle: UITheme.colors.panelBgHud,
+      borderWidth: 1.5,
+    });
 
-    this.drawPlayerHealthBar(
-      playerHealth,
-      playerMaxHealth,
+    const hpPercent = playerMaxHealth > 0 ? playerHealth / playerMaxHealth : 0;
+    drawProgressBar(
+      ctx,
       card.x + pad,
       barY,
       barWidth,
       barHeight,
+      hpPercent,
+      {
+        fillColor: hpPercent > 0.35 ? UITheme.colors.hpMid : UITheme.colors.hpLow,
+        label: `HP ${Math.ceil(playerHealth)} / ${playerMaxHealth}`,
+        fontStyle: UITheme.fonts.label,
+      },
     );
 
-    ctx.font = "600 17px system-ui, sans-serif";
-    ctx.fillStyle = "#d9e8e2";
+    ctx.font = UITheme.fonts.hud;
+    ctx.fillStyle = UITheme.colors.textSecondary;
     ctx.fillText(`Time ${formatTime(survivalTime)}`, card.x + pad, statsY);
 
-    const killsLabel = `Kills ${killCount}`;
-    const coinsLabel = `${GameIdentity.memoryCoinLabel} ${coins}`;
-    ctx.fillText(killsLabel, card.x + pad, statsY + 24);
+    ctx.fillText(`Kills ${killCount}`, card.x + pad, statsY + 22);
     ctx.textAlign = "right";
-    ctx.fillStyle = "#ffe09a";
-    ctx.fillText(coinsLabel, card.x + card.width - pad, statsY + 24);
+    ctx.fillStyle = UITheme.colors.accent;
+    ctx.fillText(`${GameIdentity.memoryCoinLabel} ${coins}`, card.x + card.width - pad, statsY + 22);
     ctx.textAlign = "left";
   }
 
@@ -138,39 +155,39 @@ export class UISystem {
     const ctx = this.context;
     const card = this.playerStatusCard;
     const panelX = card.x;
-    const panelY = card.y + card.height + 14;
+    const panelY = card.y + card.height + 10;
     const panelWidth = card.width;
-    const panelHeight = 108;
-    ctx.fillStyle = "rgba(8, 10, 14, 0.72)";
-    ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-    ctx.strokeStyle = "rgba(255, 222, 161, 0.18)";
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(panelX + 0.5, panelY + 0.5, panelWidth - 1, panelHeight - 1);
+    const panelHeight = 96;
 
-    ctx.fillStyle = "#8a9a94";
-    ctx.font = "600 14px system-ui, sans-serif";
-    ctx.fillText("PERFORMANCE", panelX + 12, panelY + 10);
-    ctx.font = "500 16px system-ui, sans-serif";
-    ctx.fillStyle = "#b8c8c2";
-    ctx.fillText(`FPS ${Math.round(fps)}`, panelX + 12, panelY + 34);
-    ctx.fillText(`Enemies ${enemyCount}`, panelX + 12, panelY + 56);
-    ctx.fillText(`Projectiles ${projectileCount}`, panelX + 12, panelY + 78);
-    ctx.fillText(`Particles ${particleCount}`, panelX + 130, panelY + 34);
-    ctx.fillText(`Pickups ${pickupCount}`, panelX + 130, panelY + 56);
+    drawPanel(ctx, panelX, panelY, panelWidth, panelHeight, {
+      fillStyle: "rgba(8, 10, 14, 0.65)",
+      borderWidth: 1,
+      cornerAccent: false,
+    });
+
+    ctx.font = UITheme.fonts.debug;
+    ctx.fillStyle = UITheme.colors.debug;
+    ctx.fillText("DEBUG", panelX + 10, panelY + 8);
+    ctx.fillStyle = UITheme.colors.textMuted;
+    ctx.fillText(`FPS ${Math.round(fps)}`, panelX + 10, panelY + 28);
+    ctx.fillText(`Enemies ${enemyCount}`, panelX + 10, panelY + 46);
+    ctx.fillText(`Proj ${projectileCount}`, panelX + 10, panelY + 64);
+    ctx.fillText(`Fx ${particleCount}`, panelX + 120, panelY + 28);
+    ctx.fillText(`Pick ${pickupCount}`, panelX + 120, panelY + 46);
   }
 
   drawPauseButton() {
     const ctx = this.context;
     const button = this.pauseButton;
 
-    ctx.fillStyle = "rgba(10, 14, 18, 0.58)";
-    ctx.fillRect(button.x, button.y, button.width, button.height);
-    ctx.strokeStyle = "rgba(255, 222, 161, 0.32)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(button.x, button.y, button.width, button.height);
+    drawPanel(ctx, button.x, button.y, button.width, button.height, {
+      fillStyle: UITheme.colors.panelBgHud,
+      borderWidth: 1.5,
+      cornerAccent: false,
+    });
 
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "700 22px system-ui, sans-serif";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.subheading;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("☰", button.x + button.width / 2, button.y + button.height / 2 + 1);
@@ -214,14 +231,14 @@ export class UISystem {
     const track = this.getVolumeTrackBounds();
     const level = clamp(volume, 0, 1);
 
-    ctx.fillStyle = "rgba(10, 14, 18, 0.58)";
-    ctx.fillRect(slider.x, slider.y, slider.width, slider.height);
-    ctx.strokeStyle = "rgba(255, 222, 161, 0.32)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(slider.x, slider.y, slider.width, slider.height);
+    drawPanel(ctx, slider.x, slider.y, slider.width, slider.height, {
+      fillStyle: UITheme.colors.panelBgHud,
+      borderWidth: 1.5,
+      cornerAccent: false,
+    });
 
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "600 18px system-ui, sans-serif";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.label;
     ctx.fillText("VOL", slider.x + 12, slider.y + 13);
 
     ctx.strokeStyle = "rgba(255, 222, 161, 0.35)";
@@ -240,7 +257,7 @@ export class UISystem {
     ctx.stroke();
 
     const knobX = track.left + fillWidth;
-    ctx.fillStyle = "#fff4dc";
+    ctx.fillStyle = UITheme.colors.textPrimary;
     ctx.beginPath();
     ctx.arc(knobX, track.centerY, 9, 0, Math.PI * 2);
     ctx.fill();
@@ -276,14 +293,14 @@ export class UISystem {
     const ctx = this.context;
     const button = this.muteButton;
 
-    ctx.fillStyle = "rgba(10, 14, 18, 0.58)";
-    ctx.fillRect(button.x, button.y, button.width, button.height);
-    ctx.strokeStyle = "rgba(255, 222, 161, 0.32)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(button.x, button.y, button.width, button.height);
+    drawPanel(ctx, button.x, button.y, button.width, button.height, {
+      fillStyle: UITheme.colors.panelBgHud,
+      borderWidth: 1.5,
+      cornerAccent: false,
+    });
 
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "700 22px system-ui, sans-serif";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.subheading;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(muted ? "🔇" : "🔊", button.x + button.width / 2, button.y + button.height / 2 + 1);
@@ -297,35 +314,34 @@ export class UISystem {
 
   drawLoadoutPanel(weapons, passives) {
     const ctx = this.context;
-    const panelX = this.width - 360;
+    const panelX = this.width - 348;
     const panelY = 28;
-    const panelWidth = 328;
-    const rowHeight = 32;
-    const headerHeight = 38;
-    const sectionGap = 18;
+    const panelWidth = 316;
+    const rowHeight = 28;
+    const headerHeight = 32;
+    const sectionGap = 14;
     const weaponsHeight = headerHeight + weapons.length * rowHeight;
     const passivesHeight = passives.length > 0 ? headerHeight + passives.length * rowHeight : 0;
-    const panelHeight = weaponsHeight + (passives.length > 0 ? sectionGap + passivesHeight : 0);
+    const panelHeight = weaponsHeight + (passives.length > 0 ? sectionGap + passivesHeight : 0) + 12;
 
-    ctx.fillStyle = "rgba(10, 14, 18, 0.58)";
-    ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-    ctx.strokeStyle = "rgba(255, 222, 161, 0.32)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+    drawPanel(ctx, panelX, panelY, panelWidth, panelHeight, {
+      fillStyle: UITheme.colors.panelBgHud,
+      borderWidth: 1.5,
+    });
 
-    let rowY = panelY + 16;
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "700 24px system-ui, sans-serif";
-    ctx.fillText("Tools", panelX + 18, rowY);
-    rowY += 30;
+    let rowY = panelY + 12;
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.subheading;
+    ctx.fillText("Tools", panelX + 16, rowY);
+    rowY += 26;
     rowY = this.drawLoadoutRows(panelX, panelWidth, rowY, weapons);
 
     if (passives.length > 0) {
       rowY += sectionGap;
-      ctx.fillStyle = "#fff4dc";
-      ctx.font = "700 24px system-ui, sans-serif";
-      ctx.fillText("Relics", panelX + 18, rowY);
-      rowY += 30;
+      ctx.fillStyle = UITheme.colors.textPrimary;
+      ctx.font = UITheme.fonts.subheading;
+      ctx.fillText("Relics", panelX + 16, rowY);
+      rowY += 26;
       this.drawLoadoutRows(panelX, panelWidth, rowY, passives);
     }
   }
@@ -333,35 +349,38 @@ export class UISystem {
   drawLoadoutRows(panelX, panelWidth, startY, items) {
     const ctx = this.context;
     let rowY = startY;
-    ctx.font = "600 20px system-ui, sans-serif";
+    ctx.font = UITheme.fonts.bodySmall;
 
     for (const item of items) {
       ctx.fillStyle = item.color;
       ctx.beginPath();
-      ctx.arc(panelX + 28, rowY + 10, 7, 0, Math.PI * 2);
+      ctx.arc(panelX + 24, rowY + 9, 5, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = item.isEvolved ? item.color : "#d9e8e2";
-      ctx.fillText(item.name, panelX + 44, rowY);
+      ctx.fillStyle = item.isEvolved ? item.color : UITheme.colors.textSecondary;
+      const name = item.name.length > 16 ? `${item.name.slice(0, 15)}…` : item.name;
+      ctx.fillText(name, panelX + 36, rowY);
 
       let levelText;
       let levelColor;
 
       if (item.isEvolved) {
-        levelText = "EVOLVED";
-        levelColor = item.color ?? "#ffe09a";
+        levelText = "EVO";
+        levelColor = item.color ?? UITheme.colors.accent;
       } else if (item.isMaxLevel) {
         levelText = "MAX";
-        levelColor = "#ffe09a";
+        levelColor = UITheme.colors.accent;
       } else {
-        levelText = `Lv ${item.level}/${item.maxLevel}`;
-        levelColor = "#9eb0aa";
+        levelText = `Lv${item.level}`;
+        levelColor = UITheme.colors.textMuted;
       }
 
+      ctx.font = UITheme.fonts.label;
       const levelWidth = ctx.measureText(levelText).width;
       ctx.fillStyle = levelColor;
-      ctx.fillText(levelText, panelX + panelWidth - levelWidth - 18, rowY);
-      rowY += 32;
+      ctx.fillText(levelText, panelX + panelWidth - levelWidth - 14, rowY + 1);
+      ctx.font = UITheme.fonts.bodySmall;
+      rowY += 28;
     }
 
     return rowY;
@@ -373,25 +392,25 @@ export class UISystem {
     }
 
     const ctx = this.context;
-    const label = `Min ${wave.minute} · ${wave.waveName}`;
-    const sublabel = wave.worldSubtitle ?? "";
+    const title = wave.waveName ?? "";
+    const subtitle = `Minute ${wave.minute ?? 1}${wave.worldSubtitle ? ` · ${wave.worldSubtitle}` : ""}`;
 
     ctx.save();
     ctx.textAlign = "center";
-    ctx.font = "700 22px system-ui, sans-serif";
-    ctx.fillStyle = "rgba(8, 9, 12, 0.82)";
-    ctx.fillText(label, this.width / 2 + 2, 34);
-    ctx.fillStyle = "#ffe09a";
-    ctx.fillText(label, this.width / 2, 32);
-
-    if (sublabel) {
-      ctx.font = "600 16px system-ui, sans-serif";
-      ctx.fillStyle = "rgba(8, 9, 12, 0.82)";
-      ctx.fillText(sublabel, this.width / 2 + 1, 58);
-      ctx.fillStyle = "#9eb0aa";
-      ctx.fillText(sublabel, this.width / 2, 57);
-    }
-
+    ctx.textBaseline = "top";
+    ctx.font = UITheme.fonts.subheading;
+    drawTextOutline(ctx, title, this.width / 2, 28, {
+      fillStyle: UITheme.colors.accent,
+      lineWidth: 2,
+      align: "center",
+    });
+    ctx.font = UITheme.fonts.bodySmall;
+    drawTextShadow(ctx, subtitle, this.width / 2, 56, {
+      fillStyle: UITheme.colors.textMuted,
+      shadowX: 1,
+      shadowY: 1,
+      align: "center",
+    });
     ctx.restore();
   }
 
@@ -407,80 +426,80 @@ export class UISystem {
     ctx.save();
     ctx.globalAlpha = fade;
 
-    ctx.fillStyle = "rgba(8, 9, 12, 0.72)";
-    ctx.fillRect(centerX - 520, 72, 1040, 118);
-    ctx.strokeStyle = "rgba(255, 222, 161, 0.35)";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(centerX - 520, 72, 1040, 118);
+    drawPanel(ctx, centerX - 480, 78, 960, 108, {
+      fillStyle: UITheme.colors.panelBg,
+      borderColor: UITheme.colors.borderSoft,
+      borderWidth: 2,
+    });
 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-
-    ctx.font = "900 54px 'Courier New', monospace";
-    ctx.fillStyle = "rgba(8, 9, 12, 0.85)";
-    ctx.fillText(announcement.title ?? announcement.text ?? "", centerX + 3, 112);
-    ctx.fillStyle = "#ffe09a";
-    ctx.fillText(announcement.title ?? announcement.text ?? "", centerX, 109);
+    ctx.font = UITheme.fonts.titleMedium;
+    drawTextOutline(ctx, announcement.title ?? announcement.text ?? "", centerX, 118, {
+      fillStyle: UITheme.colors.accent,
+      lineWidth: 3,
+      align: "center",
+      baseline: "middle",
+    });
 
     if (announcement.worldName) {
-      ctx.font = "700 28px system-ui, sans-serif";
-      ctx.fillStyle = "#fff4dc";
-      ctx.fillText(announcement.worldName, centerX, 152);
+      ctx.font = UITheme.fonts.heading;
+      drawTextShadow(ctx, announcement.worldName, centerX, 152, {
+        fillStyle: UITheme.colors.textPrimary,
+        align: "center",
+        baseline: "middle",
+      });
     }
 
     if (announcement.subtitle) {
-      ctx.font = "500 22px system-ui, sans-serif";
-      ctx.fillStyle = "#b8c4d0";
-      ctx.fillText(announcement.subtitle, centerX, 178);
+      ctx.font = UITheme.fonts.body;
+      drawTextShadow(ctx, announcement.subtitle, centerX, 178, {
+        fillStyle: UITheme.colors.textMuted,
+        align: "center",
+        baseline: "middle",
+      });
     }
 
     ctx.restore();
   }
 
   drawPlayerHealthBar(current, max, x, y, width, height) {
-    const ctx = this.context;
     const percent = clamp(current / max, 0, 1);
-    const hpText = `HP ${Math.ceil(current)} / ${max}`;
 
-    ctx.fillStyle = "rgba(8, 9, 12, 0.9)";
-    ctx.fillRect(x - 3, y - 3, width + 6, height + 6);
-    ctx.fillStyle = "#46262c";
-    ctx.fillRect(x, y, width, height);
-    ctx.fillStyle = percent > 0.35 ? "#5ed66f" : "#e45a4f";
-    ctx.fillRect(x, y, width * percent, height);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
-    ctx.fillRect(x, y, width * percent, 7);
-
-    ctx.font = "700 15px system-ui, sans-serif";
-    ctx.fillStyle = "#101318";
-    ctx.fillText(hpText, x + 10, y + 2);
-    ctx.fillStyle = "#fff4dc";
-    ctx.fillText(hpText, x + 8, y);
+    drawProgressBar(this.context, x, y, width, height, percent, {
+      fillColor: percent > 0.35 ? UITheme.colors.hpMid : UITheme.colors.hpLow,
+      label: `HP ${Math.ceil(current)} / ${max}`,
+      fontStyle: UITheme.fonts.label,
+    });
   }
 
   drawXPBar(level, xp, xpToNextLevel) {
     const ctx = this.context;
     const x = 420;
-    const y = this.height - 58;
+    const y = this.height - 52;
     const width = this.width - 840;
-    const height = 24;
-    const percent = clamp(xp / xpToNextLevel, 0, 1);
+    const height = 22;
+    const percent = xpToNextLevel > 0 ? xp / xpToNextLevel : 0;
+    const label = `LEVEL ${level}  ·  SHARDS ${xp} / ${xpToNextLevel}`;
 
-    ctx.fillStyle = "rgba(8, 9, 12, 0.82)";
-    ctx.fillRect(x - 4, y - 4, width + 8, height + 8);
-    ctx.fillStyle = "#17243a";
-    ctx.fillRect(x, y, width, height);
-    ctx.fillStyle = "#43a9ff";
-    ctx.fillRect(x, y, width * percent, height);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.26)";
-    ctx.fillRect(x, y, width * percent, 6);
+    drawPanel(ctx, x - 6, y - 6, width + 12, height + 12, {
+      fillStyle: UITheme.colors.panelBgHud,
+      borderWidth: 1.5,
+      cornerAccent: false,
+    });
+
+    drawProgressBar(ctx, x, y, width, height, percent, {
+      trackColor: "#17243a",
+      fillColor: UITheme.colors.xp,
+      label: "",
+    });
 
     ctx.textAlign = "center";
-    ctx.font = "800 22px 'Courier New', monospace";
-    ctx.fillStyle = "#101318";
-    ctx.fillText(`LEVEL ${level}  SHARDS ${xp} / ${xpToNextLevel}`, this.width / 2 + 2, y - 2);
-    ctx.fillStyle = "#fff4dc";
-    ctx.fillText(`LEVEL ${level}  SHARDS ${xp} / ${xpToNextLevel}`, this.width / 2, y - 4);
+    ctx.font = UITheme.fonts.subheading;
+    drawTextShadow(ctx, label, this.width / 2, y - 28, {
+      fillStyle: UITheme.colors.textPrimary,
+      align: "center",
+    });
     ctx.textAlign = "left";
   }
 
@@ -505,17 +524,23 @@ export class UISystem {
   }
 
   drawCooldownSlot(ctx, x, y, width, height, progress, label) {
-    ctx.fillStyle = "rgba(8, 9, 12, 0.72)";
-    ctx.fillRect(x - 2, y - 18, width + 4, height + 22);
-    ctx.fillStyle = "#17243a";
-    ctx.fillRect(x, y, width, height);
-    ctx.fillStyle = progress >= 1 ? "#7fd88a" : "#ffe09a";
-    ctx.fillRect(x, y, width * clamp(progress, 0, 1), height);
+    drawPanel(ctx, x - 4, y - 20, width + 8, height + 24, {
+      fillStyle: "rgba(8, 10, 14, 0.55)",
+      borderWidth: 1,
+      cornerAccent: false,
+    });
 
-    ctx.font = "600 14px system-ui, sans-serif";
-    ctx.fillStyle = "#b8c4d0";
+    drawProgressBar(ctx, x, y, width, height, progress, {
+      trackColor: "#17243a",
+      fillColor: progress >= 1 ? UITheme.colors.success : UITheme.colors.accent,
+      label: "",
+      shine: false,
+    });
+
+    ctx.font = UITheme.fonts.hudSmall;
+    ctx.fillStyle = UITheme.colors.textMuted;
     ctx.textAlign = "center";
-    ctx.fillText(label, x + width / 2, y - 4);
+    ctx.fillText(label, x + width / 2, y - 14);
     ctx.textAlign = "left";
   }
 
@@ -527,23 +552,25 @@ export class UISystem {
     const panelY = this.height / 2 - 300;
 
     ctx.save();
-    ctx.fillStyle = "rgba(5, 6, 9, 0.7)";
+    ctx.fillStyle = UITheme.colors.overlay;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    ctx.fillStyle = "rgba(15, 18, 24, 0.95)";
-    ctx.fillRect(panelX, panelY, 1300, 600);
-    ctx.strokeStyle = "#ffd27e";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(panelX, panelY, 1300, 600);
+    drawPanel(ctx, panelX, panelY, 1300, 600, {
+      fillStyle: UITheme.colors.panelBg,
+      borderColor: UITheme.colors.border,
+      borderWidth: 3,
+    });
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 64px 'Courier New', monospace";
-    ctx.fillText("INSIGHT GAINED", this.width / 2, panelY + 42);
+    ctx.font = UITheme.fonts.title;
+    drawTextShadow(ctx, "INSIGHT GAINED", this.width / 2, panelY + 42, {
+      fillStyle: UITheme.colors.textPrimary,
+      align: "center",
+    });
 
-    ctx.font = "700 26px 'Courier New', monospace";
-    ctx.fillStyle = "#d9e8e2";
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textSecondary;
     ctx.fillText("Choose one insight", this.width / 2, panelY + 112);
 
     choices.forEach((choice, index) => {
@@ -575,59 +602,46 @@ export class UISystem {
     const accentColor = getUpgradeAccentColor(choice);
     const isSpecial = choice.type === "trait" || choice.type === "synergy";
 
-    ctx.fillStyle = "#211d22";
-    ctx.fillRect(card.x, card.y, card.width, card.height);
-    ctx.strokeStyle = accentColor;
-    ctx.lineWidth = isSpecial ? 5 : 4;
-    ctx.strokeRect(card.x, card.y, card.width, card.height);
+    drawPanel(ctx, card.x, card.y, card.width, card.height, {
+      fillStyle: UITheme.colors.panelBgLight,
+      borderColor: accentColor,
+      borderWidth: isSpecial ? 3 : 2,
+    });
 
-    ctx.fillStyle = "#3a2c2b";
+    ctx.fillStyle = UITheme.colors.buttonInner;
     ctx.fillRect(card.x + 18, card.y + 18, 58, 58);
-    ctx.strokeStyle = "#ffd27e";
+    ctx.strokeStyle = UITheme.colors.border;
     ctx.lineWidth = 2;
     ctx.strokeRect(card.x + 18, card.y + 18, 58, 58);
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 36px 'Courier New', monospace";
-    ctx.fillText(String(index + 1), card.x + 47, card.y + 27);
+
+    ctx.textAlign = "center";
+    ctx.font = UITheme.fonts.heading;
+    drawTextShadow(ctx, String(index + 1), card.x + 47, card.y + 24, {
+      fillStyle: UITheme.colors.textPrimary,
+      align: "center",
+    });
 
     ctx.textAlign = "left";
-    ctx.fillStyle = isSpecial ? accentColor : "#9eb0aa";
-    ctx.font = "700 18px 'Courier New', monospace";
+    ctx.font = UITheme.fonts.label;
+    ctx.fillStyle = isSpecial ? accentColor : UITheme.colors.textMuted;
     ctx.fillText(categoryText, card.x + 96, card.y + 22);
 
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 30px 'Courier New', monospace";
-    this.drawWrappedText(choice.name, card.x + 96, card.y + 44, card.width - 118, 34);
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.subheading;
+    this.drawWrappedText(choice.name, card.x + 96, card.y + 44, card.width - 118, 28, 2);
 
-    ctx.fillStyle = "#d9e8e2";
-    ctx.font = "700 24px 'Courier New', monospace";
-    this.drawWrappedText(choice.description, card.x + 30, card.y + 126, card.width - 60, 34);
+    ctx.fillStyle = UITheme.colors.textSecondary;
+    ctx.font = UITheme.fonts.body;
+    this.drawWrappedText(choice.description, card.x + 30, card.y + 126, card.width - 60, 26, 4);
 
-    ctx.fillStyle = "#ffe09a";
-    ctx.font = "800 22px 'Courier New', monospace";
-    this.drawWrappedText(rankText, card.x + 30, card.y + 286, card.width - 60, 30);
+    ctx.fillStyle = UITheme.colors.accent;
+    ctx.font = UITheme.fonts.bodySmall;
+    this.drawWrappedText(rankText, card.x + 30, card.y + 286, card.width - 60, 22, 2);
     ctx.textAlign = "center";
   }
 
-  drawWrappedText(text, x, y, maxWidth, lineHeight) {
-    const words = text.split(" ");
-    let line = "";
-    let drawY = y;
-
-    for (const word of words) {
-      const testLine = line.length > 0 ? `${line} ${word}` : word;
-      const width = this.context.measureText(testLine).width;
-
-      if (width > maxWidth && line.length > 0) {
-        this.context.fillText(line, x, drawY);
-        line = word;
-        drawY += lineHeight;
-      } else {
-        line = testLine;
-      }
-    }
-
-    this.context.fillText(line, x, drawY);
+  drawWrappedText(text, x, y, maxWidth, lineHeight, maxLines = 8) {
+    wrapThemeText(this.context, text, x, y, maxWidth, lineHeight, maxLines);
   }
 
   getClickedUpgradeChoice(input) {
@@ -718,54 +732,61 @@ export class UISystem {
       const panelY = centerY - 260;
       const panelWidth = 840;
       const panelHeight = reward.isEvolution ? 560 : 520;
+      const accent = reward.accent ?? UITheme.colors.border;
 
-      ctx.fillStyle = reward.isEvolution ? "rgba(18, 12, 28, 0.97)" : "rgba(15, 18, 24, 0.96)";
-      ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-      ctx.strokeStyle = reward.accent ?? "#ffd27e";
-      ctx.lineWidth = reward.isEvolution ? 7 : 5;
-      ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
-
-      if (reward.isEvolution) {
-        ctx.strokeStyle = "rgba(255, 244, 220, 0.22)";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(panelX + 14, panelY + 14, panelWidth - 28, panelHeight - 28);
-      }
+      drawPanel(ctx, panelX, panelY, panelWidth, panelHeight, {
+        fillStyle: reward.isEvolution ? "rgba(18, 12, 28, 0.97)" : UITheme.colors.panelBg,
+        borderColor: accent,
+        borderWidth: reward.isEvolution ? 4 : 3,
+      });
 
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      ctx.fillStyle = reward.accent ?? "#ffd27e";
-      ctx.font = reward.isEvolution ? "900 64px 'Courier New', monospace" : "900 58px 'Courier New', monospace";
-      ctx.fillText(reward.isEvolution ? "TALE REWRITTEN!" : "CATALOG OPENED!", centerX, panelY + 36);
+      ctx.font = reward.isEvolution ? UITheme.fonts.title : UITheme.fonts.titleSmall;
+      drawTextOutline(ctx, reward.isEvolution ? "TALE REWRITTEN!" : "CATALOG OPENED!", centerX, panelY + 36, {
+        fillStyle: accent,
+        align: "center",
+      });
 
-      ctx.fillStyle = "#fff4dc";
-      ctx.font = "900 42px 'Courier New', monospace";
-      ctx.fillText(reward.title, centerX, panelY + 112);
+      ctx.font = UITheme.fonts.titleSmall;
+      drawTextShadow(ctx, reward.title, centerX, panelY + 112, {
+        fillStyle: UITheme.colors.textPrimary,
+        align: "center",
+      });
 
       const iconPulse = reward.isEvolution ? 1 + Math.sin(time * 10) * 0.08 : 1;
       ctx.save();
-      ctx.translate(centerX, panelY + 204);
+      ctx.translate(centerX, panelY + 224);
       ctx.scale(iconPulse, iconPulse);
-      ctx.fillStyle = reward.accent ?? "#ffd27e";
-      ctx.font = "900 72px 'Courier New', monospace";
-      ctx.fillText(reward.icon ?? "★", 0, 0);
+      ctx.font = UITheme.fonts.title;
+      drawTextOutline(ctx, reward.icon ?? "★", 0, 0, {
+        fillStyle: accent,
+        align: "center",
+        baseline: "middle",
+      });
       ctx.restore();
 
-      ctx.fillStyle = "#fff4dc";
-      ctx.font = "900 48px 'Courier New', monospace";
-      ctx.fillText(reward.name, centerX, panelY + (reward.isEvolution ? 268 : 252));
+      ctx.font = UITheme.fonts.titleSmall;
+      drawTextShadow(ctx, reward.name, centerX, panelY + (reward.isEvolution ? 268 : 252), {
+        fillStyle: UITheme.colors.textPrimary,
+        align: "center",
+      });
 
-      ctx.fillStyle = "#ffe09a";
-      ctx.font = "800 36px 'Courier New', monospace";
-      ctx.fillText(reward.headline, centerX, panelY + (reward.isEvolution ? 334 : 316));
+      ctx.font = UITheme.fonts.heading;
+      drawTextShadow(ctx, reward.headline, centerX, panelY + (reward.isEvolution ? 334 : 316), {
+        fillStyle: UITheme.colors.accent,
+        align: "center",
+      });
 
-      ctx.fillStyle = "#d9e8e2";
-      ctx.font = "700 28px 'Courier New', monospace";
+      ctx.font = UITheme.fonts.body;
+      ctx.fillStyle = UITheme.colors.textSecondary;
       this.drawWrappedText(
         reward.description,
         centerX - 320,
         panelY + (reward.isEvolution ? 392 : 372),
         640,
-        34,
+        26,
+        4,
       );
 
       const buttonWidth = 520;
@@ -777,22 +798,21 @@ export class UISystem {
         y: buttonY,
         width: buttonWidth,
         height: buttonHeight,
+        label: "SPACE OR CLICK TO CONTINUE",
       };
 
-      ctx.fillStyle = "#2a2118";
-      ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
-      ctx.strokeStyle = "#ffd27e";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
-      ctx.fillStyle = "#ffe09a";
-      ctx.font = "900 28px 'Courier New', monospace";
-      ctx.fillText("SPACE OR CLICK TO CONTINUE", centerX, buttonY + 18);
+      drawThemeButton(ctx, this.chestContinueButton, {
+        hovered: true,
+        fontStyle: UITheme.fonts.button,
+      });
     } else {
       this.chestContinueButton = null;
       ctx.textAlign = "center";
-      ctx.fillStyle = "#fff4dc";
-      ctx.font = "900 34px 'Courier New', monospace";
-      ctx.fillText("Unfolding catalog...", centerX, centerY + 150);
+      ctx.font = UITheme.fonts.heading;
+      drawTextShadow(ctx, "Unfolding catalog...", centerX, centerY + 150, {
+        fillStyle: UITheme.colors.textPrimary,
+        align: "center",
+      });
     }
 
     ctx.restore();
@@ -835,20 +855,22 @@ export class UISystem {
     const centerX = this.width / 2;
 
     ctx.save();
-    ctx.fillStyle = "rgba(5, 6, 9, 0.74)";
+    ctx.fillStyle = UITheme.colors.overlay;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    ctx.fillStyle = "rgba(15, 18, 24, 0.96)";
-    ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-    ctx.strokeStyle = "#ffd27e";
-    ctx.lineWidth = 5;
-    ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+    drawPanel(ctx, panelX, panelY, panelWidth, panelHeight, {
+      fillStyle: UITheme.colors.panelBg,
+      borderColor: UITheme.colors.border,
+      borderWidth: 3,
+    });
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 60px 'Courier New', monospace";
-    ctx.fillText("PATROL ENDED", centerX, panelY + 24);
+    ctx.font = UITheme.fonts.title;
+    drawTextShadow(ctx, "PATROL ENDED", centerX, panelY + 24, {
+      fillStyle: UITheme.colors.textPrimary,
+      align: "center",
+    });
 
     const leftX = panelX + 70;
     const rightX = panelX + panelWidth / 2 + 30;
@@ -871,16 +893,16 @@ export class UISystem {
     }
 
     rowY += 40;
-    this.drawSummaryLine(leftX, rowY, `Total Memory Coins: ${summary.totalCoins}`, "#ffe09a");
+    this.drawSummaryLine(leftX, rowY, `Total Memory Coins: ${summary.totalCoins}`, UITheme.colors.accent);
 
     rowY += 56;
     ctx.textAlign = "left";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "800 26px 'Courier New', monospace";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.subheading;
     ctx.fillText("Tools Carried", leftX, rowY);
     rowY += 36;
-    ctx.font = "700 22px 'Courier New', monospace";
-    ctx.fillStyle = "#d9e8e2";
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textSecondary;
 
     if (summary.weapons.length === 0) {
       ctx.fillText("None", leftX, rowY);
@@ -893,12 +915,12 @@ export class UISystem {
     }
 
     rowY += 14;
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "800 26px 'Courier New', monospace";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.subheading;
     ctx.fillText("Tales Rewritten", leftX, rowY);
     rowY += 36;
-    ctx.font = "700 22px 'Courier New', monospace";
-    ctx.fillStyle = "#d9e8e2";
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textSecondary;
 
     if (summary.evolutions.length === 0) {
       ctx.fillText("None this run", leftX, rowY);
@@ -930,11 +952,11 @@ export class UISystem {
     this.gameOverShopButton = shopButton;
     this.gameOverRestartButton = restartButton;
 
-    this.drawSummaryActionButton(shopButton, "#b94f42");
-    this.drawSummaryActionButton(restartButton, "#4a7058");
+    this.drawSummaryActionButton(shopButton, true);
+    this.drawSummaryActionButton(restartButton, false);
 
-    ctx.fillStyle = "#ffe09a";
-    ctx.font = "700 20px 'Courier New', monospace";
+    ctx.fillStyle = UITheme.colors.accent;
+    ctx.font = UITheme.fonts.bodySmall;
     ctx.textAlign = "center";
     ctx.fillText("Type your name, click SUBMIT, then PLAY AGAIN or BUREAU", centerX, panelY + panelHeight - 26);
     ctx.restore();
@@ -946,36 +968,36 @@ export class UISystem {
 
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "800 28px 'Courier New', monospace";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.heading;
     ctx.fillText("GLOBAL LEADERBOARD", x, y);
 
     let rowY = y + 44;
 
     if (!leaderboard.configured) {
       this.gameOverSubmitButton = null;
-      ctx.fillStyle = "#9eb0aa";
-      ctx.font = "600 20px 'Courier New', monospace";
+      ctx.fillStyle = UITheme.colors.textMuted;
+      ctx.font = UITheme.fonts.body;
       ctx.fillText("Leaderboard not configured yet", x, rowY);
       return;
     }
 
-    // Name input field
-    ctx.fillStyle = "#9eb0aa";
-    ctx.font = "600 18px 'Courier New', monospace";
+    ctx.fillStyle = UITheme.colors.textMuted;
+    ctx.font = UITheme.fonts.label;
     ctx.fillText("YOUR NAME", x, rowY);
     rowY += 26;
 
     const boxWidth = width - 160;
     const boxHeight = 44;
-    ctx.fillStyle = "#0b0e14";
-    ctx.fillRect(x, rowY, boxWidth, boxHeight);
-    ctx.strokeStyle = leaderboard.submitted ? "rgba(90, 214, 111, 0.6)" : "rgba(255, 222, 161, 0.5)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, rowY, boxWidth, boxHeight);
+    drawPanel(ctx, x, rowY, boxWidth, boxHeight, {
+      fillStyle: UITheme.colors.buttonShadow,
+      borderColor: leaderboard.submitted ? "rgba(90, 214, 111, 0.6)" : UITheme.colors.borderSoft,
+      borderWidth: 2,
+      cornerAccent: false,
+    });
 
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "700 24px 'Courier New', monospace";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.body;
     const caret = Math.floor(Date.now() / 500) % 2 === 0 ? "_" : " ";
     const nameText = (leaderboard.name ?? "").toUpperCase();
     ctx.textBaseline = "middle";
@@ -991,27 +1013,36 @@ export class UISystem {
     };
     this.gameOverSubmitButton = leaderboard.submitted ? null : submitButton;
 
-    ctx.fillStyle = leaderboard.submitted ? "#3a5044" : "#4a7058";
-    ctx.fillRect(submitButton.x, submitButton.y, submitButton.width, submitButton.height);
-    ctx.fillStyle = "#ffe09a";
-    ctx.font = "800 20px 'Courier New', monospace";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(submitButton.label, submitButton.x + submitButton.width / 2, submitButton.y + submitButton.height / 2);
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
+    if (!leaderboard.submitted) {
+      drawThemeButton(ctx, submitButton, {
+        hovered: true,
+        fontStyle: UITheme.fonts.label,
+      });
+    } else {
+      drawPanel(ctx, submitButton.x, submitButton.y, submitButton.width, submitButton.height, {
+        fillStyle: "#3a5044",
+        borderWidth: 1,
+        cornerAccent: false,
+      });
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = UITheme.fonts.label;
+      ctx.fillStyle = UITheme.colors.accent;
+      ctx.fillText(submitButton.label, submitButton.x + submitButton.width / 2, submitButton.y + submitButton.height / 2);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+    }
 
     rowY += boxHeight + 8;
 
     if (leaderboard.status) {
-      ctx.fillStyle = leaderboard.statusError ? "#ff8a72" : "#9ef59e";
-      ctx.font = "600 18px 'Courier New', monospace";
+      ctx.fillStyle = leaderboard.statusError ? UITheme.colors.warning : UITheme.colors.success;
+      ctx.font = UITheme.fonts.bodySmall;
       ctx.fillText(leaderboard.status, x, rowY);
     }
     rowY += 30;
 
-    // Top scores list
-    ctx.strokeStyle = "rgba(255, 222, 161, 0.18)";
+    ctx.strokeStyle = UITheme.colors.borderSoft;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(x, rowY);
@@ -1022,62 +1053,53 @@ export class UISystem {
     const entries = leaderboard.entries ?? [];
 
     if (leaderboard.loading) {
-      ctx.fillStyle = "#9eb0aa";
-      ctx.font = "600 20px 'Courier New', monospace";
+      ctx.fillStyle = UITheme.colors.textMuted;
+      ctx.font = UITheme.fonts.body;
       ctx.fillText("Loading...", x, rowY);
       return;
     }
 
     if (leaderboard.loadError) {
-      ctx.fillStyle = "#ff8a72";
-      ctx.font = "600 20px 'Courier New', monospace";
+      ctx.fillStyle = UITheme.colors.warning;
+      ctx.font = UITheme.fonts.body;
       ctx.fillText("Could not load leaderboard", x, rowY);
       return;
     }
 
     if (entries.length === 0) {
-      ctx.fillStyle = "#9eb0aa";
-      ctx.font = "600 20px 'Courier New', monospace";
+      ctx.fillStyle = UITheme.colors.textMuted;
+      ctx.font = UITheme.fonts.body;
       ctx.fillText("No scores yet. Be the first!", x, rowY);
       return;
     }
 
-    ctx.font = "700 19px 'Courier New', monospace";
+    ctx.font = UITheme.fonts.bodySmall;
 
     entries.slice(0, 10).forEach((entry, index) => {
       const rank = `${index + 1}.`.padEnd(3, " ");
       const name = String(entry.player_name ?? "Player").toUpperCase().slice(0, 12).padEnd(12, " ");
       const time = formatTime(entry.survival_time ?? 0);
       const line = `${rank}${name} ${time}  ${entry.kills ?? 0}k  Lv${entry.final_level ?? 1}`;
-      ctx.fillStyle = index === 0 ? "#ffe09a" : "#d9e8e2";
+      ctx.fillStyle = index === 0 ? UITheme.colors.accent : UITheme.colors.textSecondary;
       ctx.fillText(line, x, rowY);
       rowY += 30;
     });
   }
 
-  drawSummaryLine(x, y, text, color = "#d9e8e2") {
+  drawSummaryLine(x, y, text, color = UITheme.colors.textSecondary) {
     const ctx = this.context;
     ctx.textAlign = "left";
     ctx.fillStyle = color;
-    ctx.font = "700 28px 'Courier New', monospace";
+    ctx.font = UITheme.fonts.body;
     ctx.fillText(text, x, y);
   }
 
-  drawSummaryActionButton(button, accent) {
-    const ctx = this.context;
-
-    ctx.fillStyle = "#0b0e14";
-    ctx.fillRect(button.x + 6, button.y + 6, button.width, button.height);
-    ctx.fillStyle = accent;
-    ctx.fillRect(button.x, button.y, button.width, button.height);
-    ctx.fillStyle = "#2a1e28";
-    ctx.fillRect(button.x + 8, button.y + 8, button.width - 16, button.height - 16);
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "900 28px 'Courier New', monospace";
-    ctx.fillStyle = "#ffe09a";
-    ctx.fillText(button.label, button.x + button.width / 2, button.y + button.height / 2);
+  drawSummaryActionButton(button, danger = false) {
+    drawThemeButton(this.context, button, {
+      hovered: false,
+      danger,
+      fontStyle: UITheme.fonts.button,
+    });
   }
 }
 
@@ -1133,15 +1155,10 @@ function getUpgradeCategoryText(choice) {
   return "BONUS";
 }
 
-// Distinct border color so Traits/Synergies feel special and rare.
 function getUpgradeAccentColor(choice) {
-  if (choice.type === "trait") {
-    return choice.color ?? "#ff9a5a";
+  if (choice.color) {
+    return choice.color;
   }
 
-  if (choice.type === "synergy") {
-    return choice.color ?? "#7ec8ff";
-  }
-
-  return "#c8914d";
+  return getRarityColor(choice.type);
 }

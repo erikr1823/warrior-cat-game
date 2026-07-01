@@ -22,3 +22,24 @@ export function isDebugEnabled() {
     window.location.protocol === "file:"
   );
 }
+
+/** Optional ?startMin=10 or ?startTime=600 to begin at late-game rotation. */
+export function getDebugStartSurvivalTime() {
+  if (typeof window === "undefined" || !isDebugEnabled()) {
+    return 0;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const startTime = Number(params.get("startTime"));
+  const startMin = Number(params.get("startMin"));
+
+  if (Number.isFinite(startTime) && startTime > 0) {
+    return startTime;
+  }
+
+  if (Number.isFinite(startMin) && startMin > 0) {
+    return startMin * 60;
+  }
+
+  return 0;
+}

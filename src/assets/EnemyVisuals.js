@@ -8,6 +8,7 @@ import {
   getEnemySheetPath,
   getEnemySpritePath,
 } from "../config/EnemyArtDefinitions.js";
+import { getTinyMonsterDefinition, getAllTinyMonsterIds } from "../config/TinyMonsterDefinitions.js";
 import { getEnemyFrames as getProceduralEnemyFrames } from "./ProceduralSprites.js";
 
 const imageCache = new Map();
@@ -20,7 +21,7 @@ function cacheKey(packId, enemyType) {
 const SLIME_ART_PACK = "tinyMonsters";
 
 function getArtPackForEnemy(enemyType, worldPackId) {
-  if (enemyType === "slime") {
+  if (enemyType === "slime" || getTinyMonsterDefinition(enemyType)) {
     return SLIME_ART_PACK;
   }
 
@@ -101,6 +102,70 @@ function buildImageSet(enemyType, packId, image) {
   };
 }
 
+// Builds a 4-direction walk cycle from a single 32×32 tiny monster PNG.
+// Each direction gets bob/squash frames like the imported zombie sheets; left uses flip.
+const TINY_WALK_FRAME_COUNT = 4;
+const TINY_WALK_BOB = [0, 1, 0, -0.5];
+const TINY_WALK_SQUASH = [1, 0.96, 1, 1.03];
+
+function buildWalkFrameCanvases(image) {
+  const width = image.naturalWidth;
+  const height = image.naturalHeight;
+  const frames = [];
+
+  for (let index = 0; index < TINY_WALK_FRAME_COUNT; index += 1) {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, width, height);
+
+    const bob = TINY_WALK_BOB[index];
+    const scaleY = TINY_WALK_SQUASH[index];
+
+    ctx.save();
+    ctx.translate(width / 2, height);
+    ctx.scale(1, scaleY);
+    ctx.drawImage(image, -width / 2, -height + bob, width, height);
+    ctx.restore();
+
+    frames.push({
+      image: canvas,
+      sx: 0,
+      sy: 0,
+      sw: width,
+      sh: height,
+    });
+  }
+
+  return frames;
+}
+
+function buildTinyMonsterWalkSet(image) {
+  const walkFrames = buildWalkFrameCanvases(image);
+  const directions = {};
+  const facings = ["down", "right", "up", "left"];
+
+  for (const facing of facings) {
+    directions[facing] = walkFrames.map((frame) => ({
+      ...frame,
+      flipHorizontal: facing === "left",
+    }));
+  }
+
+  return {
+    frameCount: TINY_WALK_FRAME_COUNT,
+    sourceSize: Math.max(image.naturalWidth, image.naturalHeight),
+    usesSheet: true,
+    directional: true,
+    walkFps: 9,
+    idleFps: 2.5,
+    directions,
+    frames: directions.down,
+  };
+}
+
 function buildSheetSet(packId, sheet, meta) {
   if (meta.directionRows) {
     return buildDirectionalSheetSet(packId, sheet, meta);
@@ -169,6 +234,16 @@ function buildDirectionalSheetSet(packId, sheet, meta) {
 }
 
 function resolveImageSet(enemyType, packId) {
+  const tiny = getTinyMonsterDefinition(enemyType);
+
+  if (tiny) {
+    const image = loadImage(tiny.spritePath, refreshEnemyVisualCache);
+
+    if (imageReady(image)) {
+      return buildTinyMonsterWalkSet(image);
+    }
+  }
+
   const imported = getImportedEnemySheet(enemyType);
 
   if (imported) {
@@ -206,6 +281,14 @@ function isProceduralSet(visualSet) {
 }
 
 export function preloadEnemyArt() {
+  for (const id of getAllTinyMonsterIds()) {
+    const tiny = getTinyMonsterDefinition(id);
+
+    if (tiny?.spritePath) {
+      loadImage(tiny.spritePath, refreshEnemyVisualCache);
+    }
+  }
+
   for (const imported of Object.values(IMPORTED_ENEMY_SHEETS)) {
     loadImage(imported.path, refreshEnemyVisualCache);
   }
@@ -233,6 +316,12 @@ export function getEnemyVisualSet(enemyType, packId = "ink") {
 }
 
 export function getEnemyRenderSize(enemyType, packId) {
+  const tiny = getTinyMonsterDefinition(enemyType);
+
+  if (tiny) {
+    return tiny.renderSize;
+  }
+
   const imported = getImportedEnemySheet(enemyType);
 
   if (imported) {

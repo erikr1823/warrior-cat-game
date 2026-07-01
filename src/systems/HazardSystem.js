@@ -1,4 +1,6 @@
 import { distanceBetween, normalizeVector } from "../core/MathUtils.js";
+import { wrappedDistanceBetween } from "../core/WorldWrap.js";
+import { GameConfig } from "../config/GameConfig.js";
 
 // Lightweight, capped system for telegraphed ground hazards (delayed explosions)
 // and slow enemy projectiles. Both deal damage to the player only and are drawn
@@ -84,7 +86,7 @@ export class HazardSystem {
           hazard.exploded = true;
           hazard.flashTime = 0.18;
 
-          if (distanceBetween(game.player.position, hazard) <= hazard.radius + game.player.radius) {
+          if (playerDistance(game.player.position, hazard) <= hazard.radius + game.player.radius) {
             hurtPlayer(game, hazard.damage, hazard);
           }
         }
@@ -113,7 +115,7 @@ export class HazardSystem {
 
       let alive = projectile.life > 0;
 
-      if (alive && distanceBetween(game.player.position, projectile) <= projectile.radius + game.player.radius) {
+      if (alive && playerDistance(game.player.position, projectile) <= projectile.radius + game.player.radius) {
         hurtPlayer(game, projectile.damage, projectile);
         alive = false;
       }
@@ -126,4 +128,10 @@ export class HazardSystem {
 
     this.projectiles.length = writeIndex;
   }
+}
+
+function playerDistance(from, to) {
+  return GameConfig.world.wrapWorld
+    ? wrappedDistanceBetween(from, to)
+    : distanceBetween(from, to);
 }

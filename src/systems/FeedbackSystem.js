@@ -186,6 +186,14 @@ export class FeedbackSystem {
     this.audio.play("gameOver");
   }
 
+  onBiomeTransition() {
+    this.audio.play("biomeTransition");
+  }
+
+  onWorldWrap(position) {
+    this.particles.emitSparkles(position.x, position.y, "#b8dcff", 8);
+  }
+
   getLowHealthPulse() {
     return this.lowHealthPulse;
   }

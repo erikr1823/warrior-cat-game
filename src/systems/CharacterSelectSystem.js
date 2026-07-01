@@ -1,5 +1,6 @@
 import { getCharacterDefinition, PLAYABLE_CHARACTERS } from "../config/CharacterDefinitions.js";
 import { GameConfig } from "../config/GameConfig.js";
+import { UITheme, drawPanel, drawTextShadow, drawWrappedText as wrapThemeText } from "../config/UITheme.js";
 
 export class CharacterSelectSystem {
   constructor(context, width) {
@@ -39,9 +40,11 @@ export class CharacterSelectSystem {
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 34px 'Courier New', monospace";
-    ctx.fillText("CHOOSE YOUR KEEPER", this.width / 2, 206);
+    ctx.font = UITheme.fonts.heading;
+    drawTextShadow(ctx, "CHOOSE YOUR KEEPER", this.width / 2, 206, {
+      fillStyle: UITheme.colors.textPrimary,
+      align: "center",
+    });
 
     for (const button of this.characterButtons) {
       const character = getCharacterDefinition(button.characterId);
@@ -70,14 +73,15 @@ export class CharacterSelectSystem {
 
   drawCharacterCard(button, character, isSelected, isHovered) {
     const ctx = this.context;
-    const accent = character.accent ?? "#ffd27e";
+    const accent = character.accent ?? UITheme.colors.border;
     const preview = this.previews[character.id];
 
-    ctx.fillStyle = isSelected ? "rgba(24, 20, 32, 0.96)" : "rgba(10, 14, 18, 0.88)";
-    ctx.fillRect(button.x, button.y, button.width, button.height);
-    ctx.strokeStyle = isSelected ? accent : isHovered ? "#ffd27e" : "#6a5a48";
-    ctx.lineWidth = isSelected ? 4 : 3;
-    ctx.strokeRect(button.x, button.y, button.width, button.height);
+    drawPanel(ctx, button.x, button.y, button.width, button.height, {
+      fillStyle: isSelected ? "rgba(24, 20, 32, 0.96)" : UITheme.colors.panelBgHud,
+      borderColor: isSelected ? accent : isHovered ? UITheme.colors.border : UITheme.colors.borderSoft,
+      borderWidth: isSelected ? 3 : 2,
+      cornerAccent: false,
+    });
 
     if (preview?.complete && preview.naturalWidth > 0) {
       ctx.imageSmoothingEnabled = false;
@@ -93,47 +97,23 @@ export class CharacterSelectSystem {
     }
 
     ctx.textAlign = "left";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 26px 'Courier New', monospace";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.subheading;
     ctx.fillText(character.name, button.x + 118, button.y + 22);
 
     ctx.fillStyle = accent;
-    ctx.font = "700 18px 'Courier New', monospace";
+    ctx.font = UITheme.fonts.label;
     ctx.fillText(character.title.toUpperCase(), button.x + 118, button.y + 52);
 
-    ctx.fillStyle = "#d9e8e2";
-    ctx.font = "600 18px 'Courier New', monospace";
-    this.drawWrappedText(character.description, button.x + 118, button.y + 78, button.width - 136, 22);
+    ctx.fillStyle = UITheme.colors.textSecondary;
+    ctx.font = UITheme.fonts.bodySmall;
+    wrapThemeText(ctx, character.description, button.x + 118, button.y + 78, button.width - 136, 22, 2);
 
     if (isSelected) {
       ctx.textAlign = "right";
       ctx.fillStyle = accent;
-      ctx.font = "800 16px 'Courier New', monospace";
+      ctx.font = UITheme.fonts.label;
       ctx.fillText("SELECTED", button.x + button.width - 16, button.y + 18);
-    }
-  }
-
-  drawWrappedText(text, x, y, maxWidth, lineHeight) {
-    const ctx = this.context;
-    const words = text.split(" ");
-    let line = "";
-    let drawY = y;
-
-    for (const word of words) {
-      const testLine = line.length > 0 ? `${line} ${word}` : word;
-      const width = ctx.measureText(testLine).width;
-
-      if (width > maxWidth && line.length > 0) {
-        ctx.fillText(line, x, drawY);
-        line = word;
-        drawY += lineHeight;
-      } else {
-        line = testLine;
-      }
-    }
-
-    if (line.length > 0) {
-      ctx.fillText(line, x, drawY);
     }
   }
 }

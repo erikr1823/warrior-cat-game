@@ -1,6 +1,13 @@
 import { GameConfig } from "../config/GameConfig.js";
 import { directionBetween } from "../core/MathUtils.js";
+import { wrappedDirectionBetween } from "../core/WorldWrap.js";
 import { Enemy } from "../entities/Enemy.js";
+
+function directionToPlayer(from, player) {
+  return GameConfig.world.wrapWorld
+    ? wrappedDirectionBetween(from, player.position)
+    : directionBetween(from, player.position);
+}
 
 // Returns a controller function (stored on a boss Enemy as `enemy.controller`)
 // that drives a readable, telegraphed attack pattern:
@@ -130,7 +137,7 @@ function startAttack(boss, player, game, state) {
   if (roll < 0.34) {
     state.mode = "windupCharge";
     state.timer = 0.7;
-    state.dir = directionBetween(boss.position, player.position);
+    state.dir = directionToPlayer(boss.position, player);
     boss.updateFacing(state.dir);
 
     // Non-damaging warning ring around the boss telegraphs the charge.
@@ -157,7 +164,7 @@ function startAttack(boss, player, game, state) {
 }
 
 function fireSpread(boss, player, game) {
-  const base = directionBetween(boss.position, player.position);
+  const base = directionToPlayer(boss.position, player);
   const offsets = [-0.5, -0.25, 0, 0.25, 0.5];
 
   for (const offset of offsets) {

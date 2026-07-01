@@ -1,6 +1,7 @@
 import { formatTime } from "../core/MathUtils.js";
 import { GameIdentity } from "../config/GameIdentity.js";
 import { getCharacterDefinition } from "../config/CharacterDefinitions.js";
+import { UITheme, drawButton as drawThemeButton, drawPanel, drawTextShadow, drawWrappedText as wrapThemeText } from "../config/UITheme.js";
 
 export class PauseMenuSystem {
   constructor(context, width, height) {
@@ -66,7 +67,7 @@ export class PauseMenuSystem {
     const ctx = this.context;
 
     ctx.save();
-    ctx.fillStyle = "rgba(5, 6, 9, 0.72)";
+    ctx.fillStyle = UITheme.colors.overlay;
     ctx.fillRect(0, 0, this.width, this.height);
 
     if (this.page === "bureau") {
@@ -93,20 +94,22 @@ export class PauseMenuSystem {
     const panelWidth = 840;
     const panelHeight = 620;
 
-    ctx.fillStyle = "rgba(15, 18, 24, 0.96)";
-    ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-    ctx.strokeStyle = "#ffd27e";
-    ctx.lineWidth = 5;
-    ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+    drawPanel(ctx, panelX, panelY, panelWidth, panelHeight, {
+      fillStyle: UITheme.colors.panelBg,
+      borderColor: UITheme.colors.border,
+      borderWidth: 3,
+    });
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 64px 'Courier New', monospace";
-    ctx.fillText("PATROL PAUSED", centerX, panelY + 36);
+    ctx.font = UITheme.fonts.title;
+    drawTextShadow(ctx, "PATROL PAUSED", centerX, panelY + 36, {
+      fillStyle: UITheme.colors.textPrimary,
+      align: "center",
+    });
 
-    ctx.font = "600 24px 'Courier New', monospace";
-    ctx.fillStyle = "#9eb0aa";
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textMuted;
     ctx.fillText("The stacks hold still while you consult the ledger.", centerX, panelY + 108);
 
     this.mainButtons = this.buildMainButtons();
@@ -116,9 +119,9 @@ export class PauseMenuSystem {
       this.drawMenuButton(button, hovered, button.id === "abandon");
     }
 
-    ctx.font = "700 22px 'Courier New', monospace";
-    ctx.fillStyle = "#9eb0aa";
-    ctx.fillText("ESC / P = resume   ·   click a option", centerX, panelY + panelHeight - 42);
+    ctx.font = UITheme.fonts.bodySmall;
+    ctx.fillStyle = UITheme.colors.textMuted;
+    ctx.fillText("ESC / P = resume   ·   click an option", centerX, panelY + panelHeight - 42);
   }
 
   buildMainButtons() {
@@ -145,21 +148,11 @@ export class PauseMenuSystem {
   }
 
   drawMenuButton(button, hovered, danger = false) {
-    const ctx = this.context;
-    const accent = danger ? (hovered ? "#ff8a7a" : "#b94f42") : hovered ? "#ffe09a" : "#4a7058";
-
-    ctx.fillStyle = "#0b0e14";
-    ctx.fillRect(button.x + 6, button.y + 6, button.width, button.height);
-    ctx.fillStyle = accent;
-    ctx.fillRect(button.x, button.y, button.width, button.height);
-    ctx.fillStyle = danger ? "#3a1818" : "#2a1e28";
-    ctx.fillRect(button.x + 8, button.y + 8, button.width - 16, button.height - 16);
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "900 28px 'Courier New', monospace";
-    ctx.fillStyle = hovered ? "#fff6d4" : "#ffe09a";
-    ctx.fillText(button.label, button.x + button.width / 2, button.y + button.height / 2);
+    drawThemeButton(this.context, button, {
+      hovered,
+      danger,
+      fontStyle: UITheme.fonts.button,
+    });
   }
 
   drawCharInfo(input, game) {
@@ -171,37 +164,39 @@ export class PauseMenuSystem {
     const panelHeight = 936;
     const info = this.buildCharInfo(game);
 
-    ctx.fillStyle = "rgba(15, 18, 24, 0.96)";
-    ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-    ctx.strokeStyle = "#ffd27e";
-    ctx.lineWidth = 5;
-    ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+    drawPanel(ctx, panelX, panelY, panelWidth, panelHeight, {
+      fillStyle: UITheme.colors.panelBg,
+      borderColor: UITheme.colors.border,
+      borderWidth: 3,
+    });
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 56px 'Courier New', monospace";
-    ctx.fillText("KEEPER PROFILE", centerX, panelY + 28);
+    ctx.font = UITheme.fonts.titleSmall;
+    drawTextShadow(ctx, "KEEPER PROFILE", centerX, panelY + 28, {
+      fillStyle: UITheme.colors.textPrimary,
+      align: "center",
+    });
 
-    ctx.font = "700 28px 'Courier New', monospace";
-    ctx.fillStyle = "#ffe09a";
+    ctx.font = UITheme.fonts.heading;
+    ctx.fillStyle = UITheme.colors.accent;
     ctx.fillText(info.name, centerX, panelY + 96);
 
-    ctx.font = "600 22px 'Courier New', monospace";
-    ctx.fillStyle = "#9eb0aa";
-    this.drawWrappedText(info.role, panelX + 48, panelY + 132, panelWidth - 96, 28, "center");
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textMuted;
+    wrapThemeText(ctx, info.role, panelX + 48, panelY + 132, panelWidth - 96, UITheme.spacing.lineHeightSmall);
 
     const leftX = panelX + 56;
     const rightX = panelX + panelWidth / 2 + 24;
     let rowY = panelY + 196;
 
     ctx.textAlign = "left";
-    ctx.font = "800 26px 'Courier New', monospace";
-    ctx.fillStyle = "#fff4dc";
+    ctx.font = UITheme.fonts.subheading;
+    ctx.fillStyle = UITheme.colors.textPrimary;
     ctx.fillText("Current Patrol", leftX, rowY);
     rowY += 40;
-    ctx.font = "700 24px 'Courier New', monospace";
-    ctx.fillStyle = "#d9e8e2";
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textSecondary;
 
     const patrolLines = [
       `Wing: ${info.waveName}`,
@@ -219,12 +214,12 @@ export class PauseMenuSystem {
     }
 
     rowY = panelY + 196;
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "800 26px 'Courier New', monospace";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.subheading;
     ctx.fillText("Run Bonuses", rightX, rowY);
     rowY += 40;
-    ctx.font = "700 24px 'Courier New', monospace";
-    ctx.fillStyle = "#d9e8e2";
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textSecondary;
 
     const modifierLines = [
       `Damage: x${info.modifiers.damageMultiplier.toFixed(2)}`,
@@ -240,12 +235,12 @@ export class PauseMenuSystem {
     }
 
     rowY = panelY + 470;
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "800 26px 'Courier New', monospace";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.subheading;
     ctx.fillText("Tools & Relics", leftX, rowY);
     rowY += 40;
-    ctx.font = "700 24px 'Courier New', monospace";
-    ctx.fillStyle = "#d9e8e2";
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textSecondary;
 
     if (info.weapons.length === 0) {
       ctx.fillText("No tools yet", leftX, rowY);
@@ -270,12 +265,12 @@ export class PauseMenuSystem {
     }
 
     rowY = Math.max(rowY + 16, panelY + 680);
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "800 26px 'Courier New', monospace";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.subheading;
     ctx.fillText("Permanent Ledger", leftX, rowY);
     rowY += 40;
-    ctx.font = "700 22px 'Courier New', monospace";
-    ctx.fillStyle = "#d9e8e2";
+    ctx.font = UITheme.fonts.bodySmall;
+    ctx.fillStyle = UITheme.colors.textSecondary;
 
     for (const upgrade of info.metaUpgrades) {
       const levelText = upgrade.isMaxed ? "MAX" : `Lv ${upgrade.level}/${upgrade.maxLevel}`;
@@ -296,8 +291,8 @@ export class PauseMenuSystem {
     this.drawMenuButton(this.charBackButton, input.isMouseOver(this.charBackButton));
 
     ctx.textAlign = "center";
-    ctx.font = "700 20px 'Courier New', monospace";
-    ctx.fillStyle = "#9eb0aa";
+    ctx.font = UITheme.fonts.bodySmall;
+    ctx.fillStyle = UITheme.colors.textMuted;
     ctx.fillText("ESC / SPACE = back", centerX, panelY + panelHeight - 28);
   }
 
@@ -322,35 +317,5 @@ export class PauseMenuSystem {
       metaUpgrades: game.metaUpgradeSystem.getShopEntries(game.saveData),
       waveName: wave?.waveName ?? "Unknown",
     };
-  }
-
-  drawWrappedText(text, x, y, maxWidth, lineHeight, align = "left") {
-    const ctx = this.context;
-    const words = text.split(" ");
-    let line = "";
-    let drawY = y;
-
-    ctx.textAlign = align;
-
-    for (const word of words) {
-      const testLine = line.length > 0 ? `${line} ${word}` : word;
-      const width = ctx.measureText(testLine).width;
-      const anchorX = align === "center" ? x + maxWidth / 2 : x;
-
-      if (width > maxWidth && line.length > 0) {
-        ctx.fillText(line, anchorX, drawY);
-        line = word;
-        drawY += lineHeight;
-      } else {
-        line = testLine;
-      }
-    }
-
-    if (line.length > 0) {
-      const anchorX = align === "center" ? x + maxWidth / 2 : x;
-      ctx.fillText(line, anchorX, drawY);
-    }
-
-    ctx.textAlign = "left";
   }
 }

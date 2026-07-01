@@ -46,19 +46,19 @@ export const TILE_PALETTES = {
   },
   castleCourtyard: {
     grass: { bases: ["#6a5e48", "#645842", "#5e543c"], accent: ["#8a7858", "#907e60", "#7a6a50"] },
-    stone: { bases: ["#8a8070", "#807668", "#767060"], highlights: ["#a8a090", "#9e9688", "#948c80"] },
+    stone: { bases: ["#9a9080", "#8a8070", "#807668"], highlights: ["#b8b0a0", "#aea698", "#a49c90"] },
     moss: { bases: ["#7a7058", "#746a52", "#6e644c"], highlights: ["#948870", "#8a8068", "#807860"], moss: "rgba(88, 98, 48, 0.28)" },
     stroke: "rgba(48, 40, 28, 0.2)",
     edge: "rgba(32, 26, 18, 0.1)",
-    tileWeights: { moss: 0.05, stone: 0.55, grass: 0.4 },
+    tileWeights: { moss: 0.06, cracked: 0.16, stone: 0.5, grass: 0.28 },
   },
   moonlitForest: {
-    grass: { bases: ["#1a3028", "#183028", "#162c26"], accent: ["#284838", "#305040", "#244034"] },
-    stone: { bases: ["#243038", "#202c34", "#1c2830"], highlights: ["#3a4850", "#344248", "#303c44"] },
-    moss: { bases: ["#1e3428", "#1a3024", "#182c22"], highlights: ["#345040", "#304838", "#2c4434"], moss: "rgba(72, 120, 88, 0.5)" },
-    stroke: "rgba(20, 36, 32, 0.22)",
-    edge: "rgba(10, 18, 16, 0.12)",
-    tileWeights: { moss: 0.22, stone: 0.12, grass: 0.66 },
+    grass: { bases: ["#142820", "#122620", "#102420"], accent: ["#244038", "#284840", "#203830"] },
+    stone: { bases: ["#1c2830", "#182428", "#142028"], highlights: ["#344048", "#2e3a44", "#283640"] },
+    moss: { bases: ["#183024", "#142c20", "#12281e"], highlights: ["#304838", "#2c4434", "#284030"], moss: "rgba(60, 110, 90, 0.52)" },
+    stroke: "rgba(16, 32, 28, 0.22)",
+    edge: "rgba(8, 14, 12, 0.12)",
+    tileWeights: { moss: 0.24, cracked: 0.05, stone: 0.1, grass: 0.61 },
   },
   ancientCrypt: {
     grass: { bases: ["#342838", "#302434", "#2c2030"], accent: ["#443848", "#4a3e50", "#403442"] },
@@ -90,7 +90,7 @@ export const TILE_PALETTES = {
     moss: { bases: ["#5a4030", "#543a2c", "#4e3428"], highlights: ["#785840", "#705038", "#684830"], moss: "rgba(120, 88, 40, 0.3)" },
     stroke: "rgba(36, 24, 12, 0.22)",
     edge: "rgba(20, 12, 6, 0.1)",
-    tileWeights: { moss: 0.06, stone: 0.44, grass: 0.5 },
+    tileWeights: { moss: 0.04, cracked: 0.08, stone: 0.46, grass: 0.42 },
   },
   plagueVault: {
     grass: { bases: ["#2a3828", "#263424", "#223020"], accent: ["#3a4838", "#405040", "#364430"] },
@@ -106,7 +106,7 @@ export const TILE_PALETTES = {
     moss: { bases: ["#4a5868", "#445262", "#404c5c"], highlights: ["#687888", "#627282", "#5c6c7c"], moss: "rgba(140, 180, 210, 0.35)" },
     stroke: "rgba(32, 44, 56, 0.22)",
     edge: "rgba(16, 22, 32, 0.12)",
-    tileWeights: { moss: 0.14, stone: 0.58, grass: 0.28 },
+    tileWeights: { moss: 0.1, cracked: 0.16, stone: 0.54, grass: 0.2 },
   },
   boneCrypt: {
     grass: { bases: ["#3a3840", "#36343c", "#323038"], accent: ["#504e58", "#565460", "#4a4850"] },
@@ -141,16 +141,24 @@ export const TILE_PALETTES = {
     tileWeights: { moss: 0.18, stone: 0.1, grass: 0.72 },
   },
   graveyard: {
-    grass: { bases: ["#343840", "#30343c", "#2c3038"], accent: ["#444c58", "#4a5460", "#404850"] },
+    grass: { bases: ["#343a32", "#303830", "#2c342e"], accent: ["#444e40", "#4a5644", "#3e4838"] },
     stone: { bases: ["#505860", "#4a5058", "#444850"], highlights: ["#686e78", "#626870", "#5c6268"] },
-    moss: { bases: ["#3a4048", "#363a42", "#32363e"], highlights: ["#525860", "#4c5258", "#464c54"], moss: "rgba(72, 88, 108, 0.38)" },
-    stroke: "rgba(28, 32, 40, 0.22)",
-    edge: "rgba(14, 16, 22, 0.12)",
-    tileWeights: { moss: 0.14, stone: 0.46, grass: 0.4 },
+    moss: { bases: ["#3a4038", "#363a34", "#323630"], highlights: ["#525860", "#4c5248", "#464c44"], moss: "rgba(68, 88, 72, 0.4)" },
+    stroke: "rgba(28, 32, 28, 0.22)",
+    edge: "rgba(14, 16, 14, 0.12)",
+    tileWeights: { moss: 0.16, cracked: 0.1, stone: 0.42, grass: 0.32 },
+  },
+  graveyardGrounds: {
+    grass: { bases: ["#2e3830", "#2a342c", "#263028"], accent: ["#3e4a38", "#44503c", "#384432"] },
+    stone: { bases: ["#4a5058", "#444a52", "#3e444c"], highlights: ["#626870", "#5c6268", "#565c64"] },
+    moss: { bases: ["#344038", "#303c34", "#2c382e"], highlights: ["#4c5648", "#465042", "#404a3c"], moss: "rgba(58, 78, 52, 0.42)" },
+    stroke: "rgba(24, 28, 32, 0.22)",
+    edge: "rgba(12, 14, 18, 0.12)",
+    tileWeights: { moss: 0.16, stone: 0.52, grass: 0.32 },
   },
 };
 
-const DEFAULT_TILE_WEIGHTS = { moss: 0.12, stone: 0.22, grass: 0.66 };
+const DEFAULT_TILE_WEIGHTS = { moss: 0.12, cracked: 0.08, stone: 0.22, grass: 0.58 };
 
 export function getTileWeights(paletteId) {
   const palette = TILE_PALETTES[paletteId] ?? TILE_PALETTES.unwritten;
@@ -210,10 +218,29 @@ export function createGrassTile(variant, paletteId = "unwritten") {
   }
 
   ctx.fillStyle = palette.edge;
-  ctx.fillRect(0, 0, TILE_SIZE, 6);
-  ctx.fillRect(0, TILE_SIZE - 6, TILE_SIZE, 6);
-  ctx.fillRect(0, 0, 6, TILE_SIZE);
-  ctx.fillRect(TILE_SIZE - 6, 0, 6, TILE_SIZE);
+  const vignette = mulberry32(hashTile(variant, 53));
+  for (let i = 0; i < 4; i += 1) {
+    const corner = i;
+    const size = 18 + vignette() * 14;
+    ctx.globalAlpha = 0.08 + vignette() * 0.06;
+    if (corner === 0) {
+      ctx.fillRect(0, 0, size, size);
+    } else if (corner === 1) {
+      ctx.fillRect(TILE_SIZE - size, 0, size, size);
+    } else if (corner === 2) {
+      ctx.fillRect(0, TILE_SIZE - size, size, size);
+    } else {
+      ctx.fillRect(TILE_SIZE - size, TILE_SIZE - size, size, size);
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  for (let i = 0; i < 6; i += 1) {
+    ctx.fillStyle = `rgba(12, 14, 18, ${0.02 + rand() * 0.03})`;
+    ctx.beginPath();
+    ctx.ellipse(rand() * TILE_SIZE, rand() * TILE_SIZE, 6 + rand() * 10, 4 + rand() * 8, rand() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   return canvas;
 }
@@ -231,24 +258,69 @@ export function createStoneTile(variant, paletteId = "unwritten") {
   ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
   const rand = mulberry32(hashTile(variant, 29));
+  const stoneCount = 9 + (variant % 3);
 
-  for (let row = 0; row < 4; row += 1) {
-    for (let col = 0; col < 4; col += 1) {
-      const x = col * 32 + (row % 2) * 8;
-      const y = row * 32;
-      ctx.fillStyle = highlights[(row + col + variant) % highlights.length];
-      ctx.fillRect(x + 2, y + 2, 28, 26);
-      ctx.strokeStyle = "rgba(18, 20, 24, 0.22)";
-      ctx.strokeRect(x + 2, y + 2, 28, 26);
-    }
+  for (let i = 0; i < stoneCount; i += 1) {
+    const w = 22 + rand() * 28;
+    const h = 18 + rand() * 24;
+    const x = rand() * (TILE_SIZE - w);
+    const y = rand() * (TILE_SIZE - h);
+    const inset = 1 + rand() * 2;
+
+    ctx.fillStyle = highlights[(i + variant) % highlights.length];
+    ctx.beginPath();
+    ctx.moveTo(x + inset, y + h * 0.15);
+    ctx.lineTo(x + w - inset, y + inset);
+    ctx.lineTo(x + w - inset * 2, y + h - inset);
+    ctx.lineTo(x + inset * 2, y + h - inset * 1.5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(18, 20, 24, 0.18)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
 
-  for (let i = 0; i < 12; i += 1) {
-    ctx.fillStyle = `rgba(20, 24, 28, ${0.08 + rand() * 0.08})`;
+  for (let i = 0; i < 14; i += 1) {
+    ctx.fillStyle = `rgba(20, 24, 28, ${0.05 + rand() * 0.07})`;
     ctx.beginPath();
-    ctx.arc(rand() * TILE_SIZE, rand() * TILE_SIZE, 4 + rand() * 8, 0, Math.PI * 2);
+    ctx.ellipse(rand() * TILE_SIZE, rand() * TILE_SIZE, 3 + rand() * 9, 2 + rand() * 7, rand() * Math.PI, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  return canvas;
+}
+
+export function createCrackedStoneTile(variant, paletteId = "unwritten") {
+  const canvas = createStoneTile(variant, paletteId);
+  const ctx = canvas.getContext("2d");
+  const rand = mulberry32(hashTile(variant, 61));
+
+  ctx.strokeStyle = "rgba(14, 16, 20, 0.42)";
+  ctx.lineWidth = 1.5;
+
+  for (let i = 0; i < 3 + (variant % 2); i += 1) {
+    ctx.beginPath();
+    const startX = rand() * TILE_SIZE;
+    const startY = rand() * TILE_SIZE;
+    ctx.moveTo(startX, startY);
+
+    let x = startX;
+    let y = startY;
+
+    for (let step = 0; step < 3 + Math.floor(rand() * 3); step += 1) {
+      x += (rand() - 0.5) * 36;
+      y += (rand() - 0.5) * 36;
+      ctx.lineTo(x, y);
+    }
+
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = "rgba(10, 12, 16, 0.12)";
+  ctx.beginPath();
+  ctx.ellipse(24 + rand() * 80, 24 + rand() * 80, 8 + rand() * 12, 5 + rand() * 8, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   return canvas;
 }
@@ -272,9 +344,10 @@ export function createMossStoneTile(variant, paletteId = "unwritten") {
 
 export function createWorldTileSet(paletteId) {
   return {
-    grassTiles: [0, 1, 2].map((variant) => createGrassTile(variant, paletteId)),
-    stoneTiles: [0, 1].map((variant) => createStoneTile(variant, paletteId)),
-    mossStoneTiles: [0].map((variant) => createMossStoneTile(variant, paletteId)),
+    grassTiles: [0, 1, 2, 3, 4].map((variant) => createGrassTile(variant, paletteId)),
+    stoneTiles: [0, 1, 2, 3].map((variant) => createStoneTile(variant, paletteId)),
+    crackedStoneTiles: [0, 1].map((variant) => createCrackedStoneTile(variant, paletteId)),
+    mossStoneTiles: [0, 1].map((variant) => createMossStoneTile(variant, paletteId)),
   };
 }
 

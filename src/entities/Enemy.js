@@ -1,11 +1,13 @@
 import { directionBetween } from "../core/MathUtils.js";
+import { wrappedDirectionBetween } from "../core/WorldWrap.js";
 import { GameConfig } from "../config/GameConfig.js";
 import { getEnemyVisualSet, getEnemyRenderSize } from "../assets/EnemyVisuals.js";
 import { updateEnemyModifier } from "../config/EnemyModifiers.js";
+import { getEnemyConfig } from "../config/EnemyDefinitions.js";
 
 export class Enemy {
   constructor(x, y, type = "slime", modifiers = {}) {
-    const config = GameConfig.enemies[type] ?? GameConfig.enemies.slime;
+    const config = getEnemyConfig(type);
     const healthMultiplier = modifiers.healthMultiplier ?? 1;
     const speedMultiplier = modifiers.speedMultiplier ?? 1;
     const enemyPack = modifiers.enemyPack ?? "ink";
@@ -25,6 +27,7 @@ export class Enemy {
     this.collisionRadius = config.collisionRadius;
     this.radius = this.collisionRadius;
     this.animTime = Math.random() * 2;
+    this.isMoving = false;
     this.isDead = false;
     this.hitFlashTime = 0;
     this.knockbackVelocity = { x: 0, y: 0 };
@@ -53,11 +56,15 @@ export class Enemy {
 
     if (spriteSet.directional) {
       const directionFrames = spriteSet.directions[this.facing] ?? spriteSet.directions.down;
-      const frameIndex = Math.floor(this.animTime * 8) % directionFrames.length;
+      const animSpeed = this.isMoving
+        ? (spriteSet.walkFps ?? 8)
+        : (spriteSet.idleFps ?? 3);
+      const frameIndex = Math.floor(this.animTime * animSpeed) % directionFrames.length;
       return directionFrames[frameIndex];
     }
 
-    const frameIndex = Math.floor(this.animTime * 6) % spriteSet.frameCount;
+    const animSpeed = this.isMoving ? 6 : 2;
+    const frameIndex = Math.floor(this.animTime * animSpeed) % spriteSet.frameCount;
     return spriteSet.frames[frameIndex];
   }
 
@@ -76,13 +83,11 @@ export class Enemy {
       this.velocity.x += this.knockbackVelocity.x;
       this.velocity.y += this.knockbackVelocity.y;
     } else {
-      const direction = directionBetween(this.position, player.position);
+      const direction = GameConfig.world.wrapWorld
+        ? wrappedDirectionBetween(this.position, player.position)
+        : directionBetween(this.position, player.position);
       this.velocity.x = direction.x * this.speed + this.knockbackVelocity.x;
       this.velocity.y = direction.y * this.speed + this.knockbackVelocity.y;
-
-      if (Math.abs(direction.x) > 0.05 || Math.abs(direction.y) > 0.05) {
-        this.updateFacing(direction);
-      }
     }
 
     this.position.x += this.velocity.x * deltaTime;
@@ -91,6 +96,13 @@ export class Enemy {
     this.knockbackVelocity.y *= Math.max(0, 1 - GameConfig.enemies.knockbackFriction * deltaTime);
     this.hitFlashTime = Math.max(0, this.hitFlashTime - deltaTime);
     this.animTime += deltaTime;
+
+    const speed = Math.hypot(this.velocity.x, this.velocity.y);
+    this.isMoving = speed > 12;
+
+    if (speed > 12) {
+      this.updateFacing({ x: this.velocity.x / speed, y: this.velocity.y / speed });
+    }
 
     if (this.staticMark > 0) {
       this.staticMark = Math.max(0, this.staticMark - deltaTime);

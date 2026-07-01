@@ -58,6 +58,8 @@ $tinyMonstersMap = @{
   boss    = @{ File = Join-Source $TinyMonsters "tiny-lich.png"; Sheet = $false }
 }
 
+$tinyMonstersImportDir = Join-Path $root "src\assets\imported\enemies\tinyMonsters"
+
 $darkFantasyMap = @{
   bat = @{ File = Join-Source $DarkFantasy "Bat/Bat without VFX/Bat-IdleFly.png"; Sheet = $true }
 }
@@ -91,4 +93,17 @@ foreach ($packId in $packMaps.Keys) {
   Write-Host ""
 }
 
+Write-Host "Importing full 64x Tiny Monsters roster..."
+New-Item -ItemType Directory -Force -Path $tinyMonstersImportDir | Out-Null
+
+Get-ChildItem -Path $TinyMonsters -Filter "*.png" -File | ForEach-Object {
+  if ($_.Name -match '^(cover|Title)\.png$') {
+    return
+  }
+
+  Copy-Item -Force $_.FullName (Join-Path $tinyMonstersImportDir $_.Name)
+  Write-Host "  tinyMonsters/$($_.Name)"
+}
+
+Write-Host ""
 Write-Host "Done. Hard refresh the game."

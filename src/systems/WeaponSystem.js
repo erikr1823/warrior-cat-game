@@ -1,4 +1,13 @@
-import { circlesOverlap, directionBetween, distanceBetween, normalizeVector } from "../core/MathUtils.js";
+import {
+  circlesOverlap,
+  directionBetween,
+  distanceBetween,
+  normalizeVector,
+} from "../core/MathUtils.js";
+import {
+  wrappedDirectionBetween,
+  wrappedDistanceBetween,
+} from "../core/WorldWrap.js";
 import { GameConfig } from "../config/GameConfig.js";
 import {
   STARTER_WEAPON_ID,
@@ -15,6 +24,7 @@ export class WeaponSystem {
     this.visualEffects = [];
     this.bladeScratch = [];
     this.enemyScratch = [];
+    this.nearestScratch = [];
     this.manualShotCooldown = 0;
     this.behaviors = {
       arcaneBolt: (weapon, deltaTime, game) => this.updateArcaneBolt(weapon, game),
@@ -255,6 +265,7 @@ export class WeaponSystem {
       game.enemies,
       weapon.range,
       volleyCount,
+      game.collisionSystem?.enemyGrid,
     );
 
     if (targets.length === 0) {
@@ -265,7 +276,7 @@ export class WeaponSystem {
     game.feedback.onShoot();
 
     for (const target of targets) {
-      const direction = directionBetween(game.player.position, target.position);
+      const direction = playerDirection(game.player.position, target.position);
 
       game.projectiles.push(
         game.projectilePool.acquire(game.player.position.x, game.player.position.y, direction, {
@@ -310,7 +321,7 @@ export class WeaponSystem {
           continue;
         }
 
-        damageEnemy(game, enemy, weapon.damage, directionBetween(game.player.position, enemy.position));
+        damageEnemy(game, enemy, weapon.damage, playerDirection(game.player.position, enemy.position));
         weapon.hitTimers.set(enemy, weapon.hitCooldown);
 
         // Synergy: Storm Blades — blades occasionally call a small lightning strike.
@@ -345,14 +356,19 @@ export class WeaponSystem {
     });
 
     let hits = 0;
+    const nearby = game.collisionSystem?.enemyGrid?.query(
+      game.player.position,
+      weapon.radius + 96,
+      this.enemyScratch,
+    ) ?? game.enemies;
 
-    for (const enemy of game.enemies) {
+    for (const enemy of nearby) {
       if (enemy.isDead) {
         continue;
       }
 
-      if (distanceBetween(game.player.position, enemy.position) <= weapon.radius + enemy.radius) {
-        damageEnemy(game, enemy, weapon.damage, directionBetween(game.player.position, enemy.position));
+      if (playerDistance(game.player.position, enemy.position) <= weapon.radius + enemy.radius) {
+        damageEnemy(game, enemy, weapon.damage, playerDirection(game.player.position, enemy.position));
         hits += 1;
 
         // Synergy: Divine Static — Lantern Pulse marks enemies for bonus lightning.
@@ -436,18 +452,27 @@ export class WeaponSystem {
     }
 
     const chainRadius = weapon.chainRadius ?? 220;
-    const chainTarget = this.findChainTarget(enemy, game.enemies, chainRadius, hitEnemies);
+    const chainTarget = this.findChainTarget(
+      enemy,
+      game.enemies,
+      chainRadius,
+      hitEnemies,
+      game.collisionSystem?.enemyGrid,
+    );
 
     if (chainTarget) {
       this.strikeWithLightning(game, weapon, chainTarget, hitEnemies);
     }
   }
 
-  findChainTarget(sourceEnemy, enemies, chainRadius, hitEnemies) {
+  findChainTarget(sourceEnemy, enemies, chainRadius, hitEnemies, enemyGrid = null) {
     let nearestEnemy = null;
     let nearestDistance = chainRadius;
+    const nearby = enemyGrid
+      ? enemyGrid.query(sourceEnemy.position, chainRadius, this.enemyScratch)
+      : enemies;
 
-    for (const enemy of enemies) {
+    for (const enemy of nearby) {
       if (enemy.isDead || hitEnemies.has(enemy) || enemy === sourceEnemy) {
         continue;
       }
@@ -497,28 +522,49 @@ export class WeaponSystem {
     return blades;
   }
 
-  findNearestEnemies(playerPosition, enemies, range, count) {
-    const candidates = [];
+  findNearestEnemies(playerPosition, enemies, range, count, enemyGrid = null) {
+    const nearby = enemyGrid
+      ? enemyGrid.query(playerPosition, range, this.enemyScratch)
+      : enemies;
+    const candidates = this.nearestScratch;
+    candidates.length = 0;
 
-    for (const enemy of enemies) {
+    for (const enemy of nearby) {
       if (enemy.isDead) {
         continue;
       }
 
-      const distance = distanceBetween(playerPosition, enemy.position);
+      const distance = playerDistance(playerPosition, enemy.position);
 
       if (distance <= range) {
         candidates.push({ enemy, distance });
       }
     }
 
+    if (candidates.length <= count) {
+      candidates.sort((left, right) => left.distance - right.distance);
+      return candidates.map((entry) => entry.enemy);
+    }
+
     candidates.sort((left, right) => left.distance - right.distance);
     return candidates.slice(0, count).map((entry) => entry.enemy);
   }
 
-  findNearestEnemy(playerPosition, enemies, range) {
-    return this.findNearestEnemies(playerPosition, enemies, range, 1)[0] ?? null;
+  findNearestEnemy(playerPosition, enemies, range, enemyGrid = null) {
+    return this.findNearestEnemies(playerPosition, enemies, range, 1, enemyGrid)[0] ?? null;
   }
+}
+
+function playerDirection(from, to) {
+  return GameConfig.world.wrapWorld
+    ? wrappedDirectionBetween(from, to)
+    : directionBetween(from, to);
+}
+
+function playerDistance(from, to) {
+  return GameConfig.world.wrapWorld
+    ? wrappedDistanceBetween(from, to)
+    : distanceBetween(from, to);
 }
 
 function isOnScreen(enemy, camera, width, height) {

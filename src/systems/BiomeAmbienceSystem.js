@@ -1,10 +1,14 @@
 const STYLES = {
-  fireflies: { color: "rgba(255,240,120,", max: 28, size: [1.5, 3], drift: 18 },
-  pollen: { color: "rgba(255,230,160,", max: 24, size: [1, 2.5], drift: 12 },
-  mist: { color: "rgba(200,220,255,", max: 20, size: [8, 18], drift: 6 },
-  dust: { color: "rgba(220,200,160,", max: 18, size: [1, 2], drift: 10 },
-  ash: { color: "rgba(180,120,100,", max: 22, size: [1.5, 3], drift: 14 },
-  embers: { color: "rgba(255,180,90,", max: 16, size: [1, 2.5], drift: 16 },
+  fireflies: { color: "rgba(255,240,120,", max: 28, size: [1.5, 3], drift: 18, vyBias: -4 },
+  pollen: { color: "rgba(255,230,160,", max: 24, size: [1, 2.5], drift: 12, vyBias: -3 },
+  mist: { color: "rgba(200,220,255,", max: 20, size: [8, 18], drift: 6, vyBias: -2 },
+  dust: { color: "rgba(220,200,160,", max: 18, size: [1, 2], drift: 10, vyBias: -5 },
+  ash: { color: "rgba(180,120,100,", max: 22, size: [1.5, 3], drift: 14, vyBias: -6 },
+  embers: { color: "rgba(255,180,90,", max: 16, size: [1, 2.5], drift: 16, vyBias: -8 },
+  moonlitFog: { color: "rgba(100,160,180,", max: 26, size: [2, 5], drift: 10, vyBias: -5 },
+  graveAtmosphere: { color: "rgba(180,190,210,", max: 22, size: [2, 14], drift: 5, vyBias: -3, dualTone: true },
+  archiveDust: { color: "rgba(255,200,140,", max: 20, size: [1, 2.5], drift: 8, vyBias: -6 },
+  frostSnow: { color: "rgba(220,240,255,", max: 24, size: [1.5, 4], drift: 8, vyBias: 10 },
 };
 
 export class BiomeAmbienceSystem {
@@ -42,7 +46,13 @@ export class BiomeAmbienceSystem {
       particle.y += particle.vy * deltaTime;
 
       if (particle.life <= 0) {
-        this.particles.splice(i, 1);
+        const lastIndex = this.particles.length - 1;
+
+        if (i !== lastIndex) {
+          this.particles[i] = this.particles[lastIndex];
+        }
+
+        this.particles.pop();
       }
     }
 
@@ -58,15 +68,18 @@ export class BiomeAmbienceSystem {
   createParticle(camera) {
     const style = this.style;
     const size = style.size[0] + Math.random() * (style.size[1] - style.size[0]);
+    const vyBias = style.vyBias ?? -4;
+    const isMist = style.dualTone && Math.random() < 0.55;
 
     return {
       x: camera.position.x + Math.random() * this.width,
       y: camera.position.y + Math.random() * this.height,
       vx: (Math.random() - 0.5) * style.drift,
-      vy: (Math.random() - 0.5) * style.drift - 4,
-      size,
-      alpha: 0.25 + Math.random() * 0.45,
+      vy: (Math.random() - 0.5) * style.drift + vyBias,
+      size: isMist ? size * 1.6 : size,
+      alpha: isMist ? 0.12 + Math.random() * 0.18 : 0.25 + Math.random() * 0.45,
       life: 1.8 + Math.random() * 2.4,
+      tone: isMist ? "mist" : "mote",
     };
   }
 
@@ -85,7 +98,15 @@ export class BiomeAmbienceSystem {
         continue;
       }
 
-      ctx.fillStyle = `${this.style.color}${particle.alpha})`;
+      let color = this.style.color;
+
+      if (this.style.dualTone && particle.tone === "mist") {
+        color = "rgba(80,90,110,";
+      } else if (this.style.dualTone) {
+        color = "rgba(210,220,235,";
+      }
+
+      ctx.fillStyle = `${color}${particle.alpha})`;
       ctx.beginPath();
       ctx.arc(screenX, screenY, particle.size, 0, Math.PI * 2);
       ctx.fill();

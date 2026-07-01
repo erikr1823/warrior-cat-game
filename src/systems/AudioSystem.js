@@ -107,6 +107,7 @@ export class AudioSystem {
       evolution: () => this.playArpeggio([392, 494, 587, 784], 0.1, 0.08),
       playerDamage: () => this.playSweep(180, 90, 0.14, "sawtooth", 0.07),
       gameOver: () => this.playSweep(320, 80, 0.45, "triangle", 0.08),
+      biomeTransition: () => this.playArpeggio([392, 494], 0.07, 0.035),
     };
 
     handlers[type]?.();

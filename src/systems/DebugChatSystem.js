@@ -133,6 +133,42 @@ export class DebugChatSystem {
       return;
     }
 
+    if (command === "latetime" || command === "time 600" || command === "minute 10") {
+      if (game.setSurvivalTimeForDebug(600)) {
+        this.status = "Jumped to 10:00";
+      }
+      this.closeChat();
+      return;
+    }
+
+    if (command === "biome next" || command === "next biome") {
+      if (game.advanceLateGameBiomeForDebug()) {
+        this.status = "Advanced biome";
+      }
+      this.closeChat();
+      return;
+    }
+
+    const biomeMatch = command.match(/^biome\s+([0-4])$/);
+
+    if (biomeMatch) {
+      if (game.jumpToLateGameBiomeForDebug(Number(biomeMatch[1]))) {
+        this.status = `Biome ${biomeMatch[1]}`;
+      }
+      this.closeChat();
+      return;
+    }
+
+    const timeMatch = command.match(/^time\s+(\d+(?:\.\d+)?)$/);
+
+    if (timeMatch) {
+      if (game.setSurvivalTimeForDebug(Number(timeMatch[1]))) {
+        this.status = `Time ${timeMatch[1]}s`;
+      }
+      this.closeChat();
+      return;
+    }
+
     this.status = command ? `Unknown: ${command}` : "";
   }
 
@@ -210,7 +246,7 @@ export class DebugChatSystem {
     ctx.fillStyle = "#b8f0b8";
     ctx.font = "600 16px system-ui, sans-serif";
     ctx.fillText("Debug — godmode, godmode off, death", panelX + 12, panelY + 10);
-    ctx.fillText("godmodex2 · godmodex5 · godmodex10", panelX + 12, panelY + 28);
+    ctx.fillText("latetime · biome next · biome 0-4 · time 720 · F9", panelX + 12, panelY + 28);
 
     ctx.fillStyle = "#fff4dc";
     ctx.font = "500 22px system-ui, sans-serif";

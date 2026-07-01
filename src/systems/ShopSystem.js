@@ -1,5 +1,6 @@
 import { GameIdentity } from "../config/GameIdentity.js";
 import { CharacterSelectSystem } from "./CharacterSelectSystem.js";
+import { UITheme, drawButton as drawThemeButton, drawPanel, drawTextShadow, drawWrappedText as wrapThemeText } from "../config/UITheme.js";
 
 export class ShopSystem {
   constructor(context, width, height) {
@@ -94,16 +95,18 @@ export class ShopSystem {
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 72px 'Courier New', monospace";
-    ctx.fillText(GameIdentity.shopTitle, this.width / 2, 42);
+    ctx.font = UITheme.fonts.title;
+    drawTextShadow(ctx, GameIdentity.shopTitle, this.width / 2, 42, {
+      fillStyle: UITheme.colors.textPrimary,
+      align: "center",
+    });
 
-    ctx.font = "700 34px 'Courier New', monospace";
-    ctx.fillStyle = "#ffe09a";
+    ctx.font = UITheme.fonts.heading;
+    ctx.fillStyle = UITheme.colors.accent;
     ctx.fillText(`${GameIdentity.memoryCoinLabel}: ${saveData.totalCoins}`, this.width / 2, 128);
 
-    ctx.font = "600 24px 'Courier New', monospace";
-    ctx.fillStyle = "#9eb0aa";
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textMuted;
     ctx.fillText(
       mode === "pause"
         ? "Patrol paused — spend memory coins, then resume."
@@ -132,8 +135,8 @@ export class ShopSystem {
       this.drawResetButton(this.resetSaveButton);
     }
 
-    ctx.font = "700 24px 'Courier New', monospace";
-    ctx.fillStyle = "#d9e8e2";
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textSecondary;
     ctx.fillText(
       mode === "pause"
         ? "Click an upgrade to purchase   ·   Enter or click RESUME PATROL"
@@ -192,95 +195,59 @@ export class ShopSystem {
       height: 42,
     };
 
-    ctx.fillStyle = "rgba(10, 14, 18, 0.88)";
-    ctx.fillRect(card.x, card.y, card.width, card.height);
-    ctx.strokeStyle = entry.isMaxed ? "#ffe09a" : "#c8914d";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(card.x, card.y, card.width, card.height);
+    drawPanel(ctx, card.x, card.y, card.width, card.height, {
+      fillStyle: UITheme.colors.panelBgLight,
+      borderColor: entry.isMaxed ? UITheme.colors.accent : UITheme.colors.border,
+      borderWidth: 2,
+    });
 
     ctx.textAlign = "left";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 28px 'Courier New', monospace";
+    ctx.fillStyle = UITheme.colors.textPrimary;
+    ctx.font = UITheme.fonts.heading;
     ctx.fillText(entry.name, card.x + 22, card.y + 18);
 
     if (entry.optional) {
-      ctx.fillStyle = "#9eb0aa";
-      ctx.font = "700 16px 'Courier New', monospace";
+      ctx.fillStyle = UITheme.colors.textMuted;
+      ctx.font = UITheme.fonts.label;
       ctx.fillText("OPTIONAL", card.x + 22, card.y + 52);
     }
 
-    ctx.fillStyle = "#d9e8e2";
-    ctx.font = "600 22px 'Courier New', monospace";
-    ctx.fillText(entry.description, card.x + 22, card.y + (entry.optional ? 74 : 56));
+    ctx.fillStyle = UITheme.colors.textSecondary;
+    ctx.font = UITheme.fonts.bodySmall;
+    wrapThemeText(ctx, entry.description, card.x + 22, card.y + (entry.optional ? 74 : 56), card.width - 44, 22, 3);
 
-    ctx.fillStyle = entry.isMaxed ? "#ffe09a" : "#9eb0aa";
-    ctx.font = "700 20px 'Courier New', monospace";
+    ctx.fillStyle = entry.isMaxed ? UITheme.colors.accent : UITheme.colors.textMuted;
+    ctx.font = UITheme.fonts.label;
     const levelText = entry.isMaxed ? "MAX LEVEL" : `Level ${entry.level}/${entry.maxLevel}`;
     ctx.fillText(levelText, card.x + 22, card.y + card.height - 28);
 
-    ctx.fillStyle = entry.canBuy ? "#2a2118" : "#1a1418";
-    ctx.fillRect(buyButton.x, buyButton.y, buyButton.width, buyButton.height);
-    ctx.strokeStyle = entry.canBuy ? "#ffd27e" : "#6a5a48";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(buyButton.x, buyButton.y, buyButton.width, buyButton.height);
-
-    ctx.textAlign = "center";
-    ctx.fillStyle = entry.isMaxed ? "#ffe09a" : entry.canBuy ? "#ffe09a" : "#8a7a68";
-    ctx.font = "800 18px 'Courier New', monospace";
-    ctx.fillText(
-      entry.isMaxed ? "MAX" : `${entry.cost} G`,
-      buyButton.x + buyButton.width / 2,
-      buyButton.y + 11,
-    );
+    drawThemeButton(ctx, buyButton, {
+      hovered: entry.canBuy,
+      label: entry.isMaxed ? "MAX" : `${entry.cost} G`,
+      fontStyle: UITheme.fonts.label,
+    });
     ctx.textAlign = "left";
   }
 
   drawActionButton(button, isHovered) {
-    const ctx = this.context;
-
-    ctx.fillStyle = "#0b0e14";
-    ctx.fillRect(button.x + 8, button.y + 8, button.width, button.height);
-    ctx.fillStyle = isHovered ? "#ffe09a" : "#b94f42";
-    ctx.fillRect(button.x, button.y, button.width, button.height);
-    ctx.fillStyle = isHovered ? "#55323a" : "#2a1e28";
-    ctx.fillRect(button.x + 10, button.y + 10, button.width - 20, button.height - 20);
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "900 36px 'Courier New', monospace";
-    ctx.fillStyle = isHovered ? "#fff6d4" : "#ffe09a";
-    ctx.fillText(button.label, button.x + button.width / 2, button.y + button.height / 2);
+    drawThemeButton(this.context, button, {
+      hovered: isHovered,
+      fontStyle: UITheme.fonts.buttonLarge,
+    });
   }
 
   drawResetButton(button) {
-    const ctx = this.context;
-
-    ctx.fillStyle = "rgba(20, 12, 16, 0.92)";
-    ctx.fillRect(button.x, button.y, button.width, button.height);
-    ctx.strokeStyle = "#8a4a4a";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(button.x, button.y, button.width, button.height);
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "800 20px 'Courier New', monospace";
-    ctx.fillStyle = "#ff9a9a";
-    ctx.fillText(button.label, button.x + button.width / 2, button.y + button.height / 2);
+    drawThemeButton(this.context, button, {
+      hovered: false,
+      danger: true,
+      fontStyle: UITheme.fonts.label,
+    });
   }
 
   drawBackButton(button, isHovered) {
-    const ctx = this.context;
-
-    ctx.fillStyle = isHovered ? "rgba(30, 24, 36, 0.96)" : "rgba(20, 16, 28, 0.92)";
-    ctx.fillRect(button.x, button.y, button.width, button.height);
-    ctx.strokeStyle = isHovered ? "#ffd27e" : "#8a7a68";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(button.x, button.y, button.width, button.height);
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "800 20px 'Courier New', monospace";
-    ctx.fillStyle = isHovered ? "#fff4dc" : "#d9e8e2";
-    ctx.fillText(button.label, button.x + button.width / 2, button.y + button.height / 2);
+    drawThemeButton(this.context, button, {
+      hovered: isHovered,
+      fontStyle: UITheme.fonts.label,
+    });
   }
 }

@@ -259,6 +259,10 @@ export class Input {
     return this.justPressedKeys.has("Escape") || this.justPressedKeys.has("KeyP");
   }
 
+  wasDebugBiomeAdvanceJustPressed() {
+    return this.justPressedKeys.has("F9");
+  }
+
   getChoicePressed() {
     if (this.justPressedKeys.has("Digit1")) {
       return 0;

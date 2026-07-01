@@ -5,7 +5,9 @@ import { getWorldForWave } from "../config/WorldDefinitions.js";
 import { Enemy } from "../entities/Enemy.js";
 import { WaveDirector } from "./WaveDirector.js";
 import { BossDirector } from "./BossDirector.js";
-import { pickModifierForTime, applyEnemyModifier } from "../config/EnemyModifiers.js";
+import { pickModifierForTime, applyEnemyModifier, ENEMY_MODIFIERS } from "../config/EnemyModifiers.js";
+import { isLateGameTime, getLateGameEliteChanceBonus } from "../config/LateGameBiomeDefinitions.js";
+import { pickBiomePreferredModifier } from "../config/BiomeEnemyThemes.js";
 
 export class Spawner {
   constructor(camera) {
@@ -86,13 +88,29 @@ export class Spawner {
     }
 
     const minutes = game.survivalTime / 60;
-    const chance = Math.min(config.maxChance, config.baseChance + config.chancePerMinute * minutes);
+    let chance = Math.min(config.maxChance, config.baseChance + config.chancePerMinute * minutes);
+
+    if (isLateGameTime(game.survivalTime)) {
+      chance = Math.min(config.maxChance + 0.08, chance + getLateGameEliteChanceBonus(game.survivalTime));
+    }
 
     if (Math.random() >= chance) {
       return;
     }
 
-    const modifierId = pickModifierForTime(game.survivalTime);
+    const allowed = Object.keys(ENEMY_MODIFIERS).filter(
+      (id) => game.survivalTime >= (ENEMY_MODIFIERS[id].minTime ?? 0),
+    );
+    let modifierId = null;
+
+    if (isLateGameTime(game.survivalTime)) {
+      const world = getWorldForWave(getWaveForTime(game.survivalTime));
+      modifierId = pickBiomePreferredModifier(world.id, game.survivalTime, allowed);
+    }
+
+    if (!modifierId) {
+      modifierId = pickModifierForTime(game.survivalTime);
+    }
 
     if (modifierId) {
       applyEnemyModifier(enemy, modifierId);

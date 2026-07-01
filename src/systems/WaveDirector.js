@@ -1,6 +1,25 @@
 import { GameConfig } from "../config/GameConfig.js";
 import { getWaveForTime, getWaveMinute } from "../config/WaveDefinitions.js";
+import { isLateGameTime } from "../config/LateGameBiomeDefinitions.js";
 import { getWorldForWave } from "../config/WorldDefinitions.js";
+import {
+  getRotatingEnemyTypes,
+  getEnemyRotationAnnouncement,
+  getRotationSlotIndex,
+  pickRotatingEnemyType,
+} from "../config/EnemyRotationDefinitions.js";
+import {
+  getBiomeEnemyTheme,
+  getBiomeThemedEnemyPair,
+  getBiomeRotationAnnouncement,
+  pickBiomeThemedEnemyFromPair,
+} from "../config/BiomeEnemyThemes.js";
+import {
+  getLateGameEliteChanceBonus,
+  getLateGameHealthMultiplier,
+  getLateGameSpawnPressure,
+  getLateGameSpeedMultiplier,
+} from "../config/LateGameBiomeDefinitions.js";
 
 export class WaveDirector {
   constructor() {
@@ -10,26 +29,50 @@ export class WaveDirector {
   reset() {
     this.currentWaveId = 1;
     this.currentWorldId = "castleCourtyard";
+    this.currentRotationSlot = -1;
     this.announcementTitle = "";
     this.announcementSubtitle = "";
     this.announcementWorldName = "";
     this.announcementTime = 0;
+    this.enemyRotationTitle = "";
+    this.enemyRotationSubtitle = "";
+    this.enemyRotationTime = 0;
   }
 
   update(survivalTime, deltaTime) {
     const wave = getWaveForTime(survivalTime);
     const world = getWorldForWave(wave);
+    const rotationSlot = getRotationSlotIndex(survivalTime);
+    const lateGame = isLateGameTime(survivalTime);
+
+    if (rotationSlot !== this.currentRotationSlot) {
+      this.currentRotationSlot = rotationSlot;
+      const rotationAnnouncement = lateGame
+        ? getBiomeRotationAnnouncement(world.id, survivalTime)
+        : getEnemyRotationAnnouncement(survivalTime);
+      this.enemyRotationTitle = rotationAnnouncement.title;
+      this.enemyRotationSubtitle = rotationAnnouncement.subtitle;
+      this.enemyRotationTime = GameConfig.waves.announcementDuration;
+    }
 
     if (wave.id !== this.currentWaveId) {
       this.currentWaveId = wave.id;
       this.currentWorldId = world.id;
       this.announcementTitle = wave.announcement;
-      this.announcementSubtitle = world.announcementSuffix ?? world.subtitle;
+      const theme = getBiomeEnemyTheme(world.id);
+
+      if (lateGame && theme?.subtitle) {
+        this.announcementSubtitle = `${world.announcementSuffix ?? world.subtitle} · ${theme.subtitle}`;
+      } else {
+        this.announcementSubtitle = world.announcementSuffix ?? world.subtitle;
+      }
+
       this.announcementWorldName = world.name;
       this.announcementTime = GameConfig.waves.announcementDuration;
     }
 
     this.announcementTime = Math.max(0, this.announcementTime - deltaTime);
+    this.enemyRotationTime = Math.max(0, this.enemyRotationTime - deltaTime);
   }
 
   getSpawnInterval(survivalTime, bossDefeatedCount = 0) {
@@ -60,6 +103,10 @@ export class WaveDirector {
       interval *= scaling.midGameSpawnIntervalMultiplier ?? 0.9;
     }
 
+    if (isLateGameTime(survivalTime)) {
+      interval /= getLateGameSpawnPressure(survivalTime);
+    }
+
     if (bossDefeatedCount > 0) {
       interval *= Math.max(
         0.72,
@@ -71,14 +118,23 @@ export class WaveDirector {
   }
 
   pickEnemyType(survivalTime) {
-    const wave = getWaveForTime(survivalTime);
-    const weights = { ...wave.spawnWeights };
+    const world = getWorldForWave(getWaveForTime(survivalTime));
 
-    if (wave.eliteChance && !weights.elite) {
-      weights.elite = wave.eliteChance;
+    if (isLateGameTime(survivalTime)) {
+      return pickBiomeThemedEnemyFromPair(world.id, survivalTime);
     }
 
-    return pickWeightedType(weights);
+    return pickRotatingEnemyType(survivalTime);
+  }
+
+  getActiveEnemyTypes(survivalTime) {
+    const world = getWorldForWave(getWaveForTime(survivalTime));
+
+    if (isLateGameTime(survivalTime)) {
+      return getBiomeThemedEnemyPair(world.id, survivalTime);
+    }
+
+    return getRotatingEnemyTypes(survivalTime);
   }
 
   getHealthMultiplier(survivalTime, bossDefeatedCount = 0) {
@@ -96,6 +152,10 @@ export class WaveDirector {
       multiplier *= earlyMultiplier + (1 - earlyMultiplier) * progress;
     }
 
+    if (isLateGameTime(survivalTime)) {
+      multiplier *= getLateGameHealthMultiplier(survivalTime);
+    }
+
     if (bossDefeatedCount > 0) {
       multiplier *= 1 + bossDefeatedCount * (scaling.bossDefeatHealthBonus ?? 0.08);
     }
@@ -105,23 +165,34 @@ export class WaveDirector {
 
   getSpeedMultiplier(survivalTime) {
     const scaling = GameConfig.waves.scaling;
-    return Math.min(
+    let multiplier = Math.min(
       scaling.maxSpeedMultiplier,
       1 + survivalTime * scaling.speedGrowthPerSecond,
     );
+
+    if (isLateGameTime(survivalTime)) {
+      multiplier *= getLateGameSpeedMultiplier(survivalTime);
+    }
+
+    return multiplier;
   }
 
   getDisplayInfo(survivalTime) {
     const wave = getWaveForTime(survivalTime);
     const world = getWorldForWave(wave);
+    const enemyTypes = this.getActiveEnemyTypes(survivalTime);
 
     return {
       waveId: wave.id,
       waveName: wave.name,
       worldName: world.name,
       worldSubtitle: world.subtitle,
+      enemyType: enemyTypes[0],
+      enemyTypes,
       minute: getWaveMinute(survivalTime),
       survivalTime,
+      isLateGame: Boolean(wave.isLateGame),
+      lateGameStage: wave.lateGameStage ?? null,
     };
   }
 
@@ -130,6 +201,19 @@ export class WaveDirector {
   }
 
   getAnnouncement() {
+    if (this.enemyRotationTime > 0) {
+      const duration = GameConfig.waves.announcementDuration || 2.8;
+
+      return {
+        title: this.enemyRotationTitle,
+        subtitle: this.enemyRotationSubtitle,
+        worldName: "",
+        text: `${this.enemyRotationTitle}  ·  ${this.enemyRotationSubtitle}`,
+        alpha: Math.min(1, this.enemyRotationTime / 0.6),
+        progress: Math.min(1, this.enemyRotationTime / duration),
+      };
+    }
+
     if (this.announcementTime <= 0) {
       return null;
     }
@@ -143,20 +227,4 @@ export class WaveDirector {
       progress: Math.min(1, this.announcementTime / (GameConfig.waves.announcementDuration || 2.8)),
     };
   }
-}
-
-function pickWeightedType(weights) {
-  const entries = Object.entries(weights).filter(([, weight]) => weight > 0);
-  const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
-  let roll = Math.random() * totalWeight;
-
-  for (const [type, weight] of entries) {
-    roll -= weight;
-
-    if (roll <= 0) {
-      return type;
-    }
-  }
-
-  return entries[0]?.[0] ?? "slime";
 }

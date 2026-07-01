@@ -1,6 +1,7 @@
 import { GameConfig } from "../config/GameConfig.js";
 import { EverRogueTileset } from "../assets/EverRogueTileset.js";
-import { drawBiomeDecoration } from "../assets/BiomeDecorations.js";
+import { drawBiomeDecoration, drawBiomeCluster, drawFloorOverlay } from "../assets/BiomeDecorations.js";
+import { getBiomeEnvironment } from "../config/BiomeEnvironmentConfig.js";
 import {
   createWorldTileSet,
   getTileSize,
@@ -8,6 +9,7 @@ import {
   hashTile,
   mulberry32,
 } from "../assets/WorldTiles.js";
+import { wrapWorldPosition } from "../core/WorldWrap.js";
 
 const DEFAULT_DECORATION_TYPES = ["rock", "bone", "grassPatch", "candle", "ruin"];
 
@@ -88,7 +90,17 @@ export class WorldMap {
     position.y = Math.max(this.bounds.minY, Math.min(this.bounds.maxY, position.y));
   }
 
+  wrapPosition(position) {
+    if (!this.config.wrapWorld) {
+      this.clampPosition(position);
+      return false;
+    }
+
+    return wrapWorldPosition(position, this.bounds);
+  }
+
   draw(ctx, camera) {
+    ctx.imageSmoothingEnabled = false;
     this.drawTiles(ctx, camera);
     this.drawDecorations(ctx, camera);
     this.drawEdgeFade(ctx, camera);
@@ -100,16 +112,43 @@ export class WorldMap {
     const rand = mulberry32(hash);
     const roll = rand();
     const weights = this.activeTileWeights;
+    const moss = weights.moss ?? 0.12;
+    const cracked = weights.cracked ?? 0.08;
+    const stone = weights.stone ?? 0.22;
 
-    if (roll < weights.moss) {
+    if (roll < moss) {
       return tiles.mossStoneTiles[this.modIndex(hash, tiles.mossStoneTiles.length)];
     }
 
-    if (roll < weights.moss + weights.stone) {
+    if (roll < moss + cracked && tiles.crackedStoneTiles?.length) {
+      return tiles.crackedStoneTiles[this.modIndex(hash, tiles.crackedStoneTiles.length)];
+    }
+
+    if (roll < moss + cracked + stone) {
       return tiles.stoneTiles[this.modIndex(hash, tiles.stoneTiles.length)];
     }
 
     return tiles.grassTiles[this.modIndex(hash, tiles.grassTiles.length)];
+  }
+
+  drawFloorOverlayForTile(ctx, tileX, tileY, screenX, screenY, tileSize) {
+    const env = getBiomeEnvironment(this.activeWorldId);
+
+    if (!env.floorOverlays?.length) {
+      return;
+    }
+
+    const hash = hashTile(tileX, tileY);
+    const rand = mulberry32(hash ^ 0xf10bad0);
+    const overlayRoll = rand();
+
+    if (overlayRoll > env.overlayChance) {
+      return;
+    }
+
+    const overlayType =
+      env.floorOverlays[Math.floor(rand() * env.floorOverlays.length)] ?? env.floorOverlays[0];
+    drawFloorOverlay(ctx, overlayType, hash, screenX, screenY, tileSize);
   }
 
   drawProceduralTile(ctx, tileX, tileY, screenX, screenY, tileSize) {
@@ -117,11 +156,12 @@ export class WorldMap {
 
     if (tile) {
       ctx.drawImage(tile, screenX, screenY, tileSize, tileSize);
-      return;
+    } else {
+      ctx.fillStyle = "#3f5a3d";
+      ctx.fillRect(screenX, screenY, tileSize, tileSize);
     }
 
-    ctx.fillStyle = "#3f5a3d";
-    ctx.fillRect(screenX, screenY, tileSize, tileSize);
+    this.drawFloorOverlayForTile(ctx, tileX, tileY, screenX, screenY, tileSize);
   }
 
   modIndex(value, length) {
@@ -134,8 +174,6 @@ export class WorldMap {
     const endTileX = Math.ceil((camera.position.x + camera.width) / tileSize) + 1;
     const startTileY = Math.floor(camera.position.y / tileSize) - 1;
     const endTileY = Math.ceil((camera.position.y + camera.height) / tileSize) + 1;
-
-    ctx.imageSmoothingEnabled = false;
 
     for (let tileY = startTileY; tileY <= endTileY; tileY += 1) {
       for (let tileX = startTileX; tileX <= endTileX; tileX += 1) {
@@ -150,6 +188,8 @@ export class WorldMap {
 
           if (!drew) {
             this.drawProceduralTile(ctx, tileX, tileY, screenX, screenY, tileSize);
+          } else {
+            this.drawFloorOverlayForTile(ctx, tileX, tileY, screenX, screenY, tileSize);
           }
         } else {
           this.drawProceduralTile(ctx, tileX, tileY, screenX, screenY, tileSize);
@@ -178,28 +218,110 @@ export class WorldMap {
 
   generateChunkDecorations(chunkX, chunkY) {
     const rand = mulberry32(hashTile(chunkX, chunkY) ^ 0x9e3779b9);
-    const count = Math.floor(rand() * 6) + 4;
+    const env = getBiomeEnvironment(this.activeWorldId);
+    const countMin = env.decorationsPerChunk[0];
+    const countMax = env.decorationsPerChunk[1];
+    const count = Math.floor(rand() * (countMax - countMin + 1)) + countMin;
+    const density = this.config.decorationDensity * (env.densityMultiplier ?? 1);
     const decorations = [];
     const chunkWorldX = chunkX * this.chunkSize;
     const chunkWorldY = chunkY * this.chunkSize;
+    const margin = 96;
+    const edgeBias = env.preferEdgePlacement ?? 0;
 
     for (let i = 0; i < count; i += 1) {
-      if (rand() > this.config.decorationDensity) {
+      if (rand() > density) {
         continue;
       }
 
-      const type =
-        this.activeDecorationTypes[Math.floor(rand() * this.activeDecorationTypes.length)];
+      let type;
+
+      if (this.activeWorldId === "graveyard" && rand() < (env.chapelChance ?? 0)) {
+        type = "chapel";
+      } else {
+        const pool = this.activeDecorationTypes;
+        type = pool[Math.floor(rand() * pool.length)] ?? "tombstone";
+      }
+
+      const position = this.pickDecorationPosition(
+        rand,
+        chunkWorldX,
+        chunkWorldY,
+        margin,
+        edgeBias,
+      );
+
       decorations.push({
+        kind: "prop",
         type,
-        x: chunkWorldX + rand() * this.chunkSize,
-        y: chunkWorldY + rand() * this.chunkSize,
+        x: position.x,
+        y: position.y,
         variant: Math.floor(rand() * 1000),
         scale: 0.85 + rand() * 0.35,
       });
     }
 
+    if (env.clusters?.length && rand() < (env.clusterChance ?? 0)) {
+      const clusterType = env.clusters[Math.floor(rand() * env.clusters.length)];
+      const position = this.pickDecorationPosition(
+        rand,
+        chunkWorldX,
+        chunkWorldY,
+        margin + 16,
+        Math.max(edgeBias, 0.55),
+      );
+
+      decorations.unshift({
+        kind: "cluster",
+        type: clusterType,
+        x: position.x,
+        y: position.y,
+        variant: Math.floor(rand() * 1000),
+        scale: 0.95 + rand() * 0.2,
+      });
+    }
+
     return decorations;
+  }
+
+  pickDecorationPosition(rand, chunkWorldX, chunkWorldY, margin, edgeBias = 0) {
+    const innerSize = this.chunkSize - margin * 2;
+
+    if (edgeBias <= 0 || rand() > edgeBias) {
+      return {
+        x: chunkWorldX + margin + rand() * innerSize,
+        y: chunkWorldY + margin + rand() * innerSize,
+      };
+    }
+
+    const side = Math.floor(rand() * 4);
+    const band = margin + rand() * Math.min(120, innerSize * 0.35);
+
+    if (side === 0) {
+      return {
+        x: chunkWorldX + band,
+        y: chunkWorldY + margin + rand() * innerSize,
+      };
+    }
+
+    if (side === 1) {
+      return {
+        x: chunkWorldX + this.chunkSize - band,
+        y: chunkWorldY + margin + rand() * innerSize,
+      };
+    }
+
+    if (side === 2) {
+      return {
+        x: chunkWorldX + margin + rand() * innerSize,
+        y: chunkWorldY + band,
+      };
+    }
+
+    return {
+      x: chunkWorldX + margin + rand() * innerSize,
+      y: chunkWorldY + this.chunkSize - band,
+    };
   }
 
   drawDecorations(ctx, camera) {
@@ -231,6 +353,16 @@ export class WorldMap {
   }
 
   drawDecoration(ctx, decoration, x, y) {
+    if (decoration.kind === "cluster") {
+      const scale = decoration.scale ?? 1;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      drawBiomeCluster(ctx, decoration.type, decoration.variant);
+      ctx.restore();
+      return;
+    }
+
     if (
       this.usesEverRogueTiles() &&
       this.tileset.drawDecoration(ctx, decoration.type, decoration.variant, x, y, decoration.scale)
@@ -248,6 +380,10 @@ export class WorldMap {
   }
 
   drawEdgeFade(ctx, camera) {
+    if (this.config.wrapWorld) {
+      return;
+    }
+
     const bounds = this.bounds;
     const fadeSize = this.config.edgeFadeSize ?? 420;
     const playerWorldX = camera.position.x + camera.width / 2;

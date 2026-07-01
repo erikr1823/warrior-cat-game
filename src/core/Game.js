@@ -31,7 +31,10 @@ import { DebugChatSystem } from "../systems/DebugChatSystem.js";
 import { LeaderboardSystem } from "../systems/LeaderboardSystem.js";
 import { applyGodModeToPlayer } from "../debug/GodMode.js";
 import { isDebugEnabled } from "../debug/debugEnabled.js";
+import { getTimeForLateGameBiomeIndex, getTimeForNextLateGameBiome } from "../config/LateGameBiomeDefinitions.js";
 import { preloadEnemyArt } from "../assets/EnemyVisuals.js";
+import { getWaveForTime } from "../config/WaveDefinitions.js";
+import { getWorldForWave } from "../config/WorldDefinitions.js";
 
 export class Game {
   constructor(canvas) {
@@ -60,6 +63,10 @@ export class Game {
     this.ui = new UISystem(this.context, this.width, this.height);
     this.worldMap = new WorldMap();
     this.biomeAmbience = new BiomeAmbienceSystem(this.width, this.height);
+    this.biomeTransition = { time: 0, duration: 1, fill: "#141820" };
+    this.cachedRenderWorld = null;
+    this.cachedRenderWorldId = "";
+    this.bossActive = false;
     this.debugEnabled = isDebugEnabled();
     this.debugChat = new DebugChatSystem(this.context, this.width, this.height, this.debugEnabled);
     this.godMode = false;
@@ -184,6 +191,12 @@ export class Game {
   }
 
   updateLevelUp() {
+    if (this.levelUpChoices.length === 0) {
+      this.state = "playing";
+      this.processLevelUps();
+      return;
+    }
+
     this.ui.layoutUpgradeChoiceCards(this.levelUpChoices);
 
     const keyboardChoice = this.input.getChoicePressed();
@@ -292,6 +305,14 @@ export class Game {
       return;
     }
 
+    if (this.debugEnabled && this.state === "playing" && this.input.justPressedKeys.has("F9")) {
+      this.advanceLateGameBiomeForDebug();
+    }
+
+    if (this.input.justPressedKeys.has("F3")) {
+      this.ui.showPerfStats = !this.ui.showPerfStats;
+    }
+
     if (this.tryOpenPauseFromInput()) {
       return;
     }
@@ -320,7 +341,7 @@ export class Game {
       this.weaponSystem.fireManualInkFlick(this, this.player.aimDirection);
     }
 
-    this.worldMap.clampPosition(this.player.position);
+    this.applyPlayerWorldWrap();
     this.camera.follow(this.player.position);
     this.spawner.update(step, this);
 
@@ -359,29 +380,93 @@ export class Game {
     this.collisionSystem.prepareFrame(this.enemies);
     this.weaponSystem.update(step, this);
     this.collisionSystem.update(step, this);
+    if (this.applyPlayerWorldWrap()) {
+      this.camera.follow(this.player.position);
+    }
     this.removeDeadEntities();
     this.processLevelUps();
 
     const currentWorld = this.spawner.getWaveDirector().getCurrentWorld(this.survivalTime);
+
+    if (currentWorld.id !== this.cachedRenderWorldId) {
+      this.applyWorldTheme(currentWorld);
+    }
+
+    this.cachedRenderWorld = currentWorld;
     this.biomeAmbience.update(step, this.camera, currentWorld);
+
+    if (this.biomeTransition.time > 0) {
+      this.biomeTransition.time = Math.max(0, this.biomeTransition.time - step);
+    }
+
+    this.bossActive = false;
+
+    for (const enemy of this.enemies) {
+      if (enemy.isBoss && !enemy.isDead) {
+        this.bossActive = true;
+        break;
+      }
+    }
+  }
+
+  applyPlayerWorldWrap() {
+    const wrapped = this.worldMap.wrapPosition(this.player.position);
+
+    if (!wrapped) {
+      return false;
+    }
+
+    this.feedback.onWorldWrap(this.player.position);
+    this.startScreenShake(2.5, 0.12);
+    return true;
   }
 
   applyWorldTheme(currentWorld) {
+    const prevWorldId = this.worldMap.activeWorldId;
+
     if (typeof this.worldMap.applyWorld === "function") {
       this.worldMap.applyWorld(currentWorld);
+    } else {
+      const paletteId = currentWorld?.tilePalette ?? "castleCourtyard";
+      this.worldMap.setTilePalette(paletteId);
+
+      if (currentWorld?.id) {
+        this.worldMap.activeWorldId = currentWorld.id;
+      }
+
+      if (currentWorld?.decorationTypes?.length > 0) {
+        this.worldMap.activeDecorationTypes = currentWorld.decorationTypes;
+      }
+    }
+
+    if (
+      prevWorldId &&
+      currentWorld?.id &&
+      prevWorldId !== currentWorld.id &&
+      this.survivalTime > 0.05
+    ) {
+      this.biomeTransition.time = this.biomeTransition.duration;
+      this.biomeTransition.fill = currentWorld.transitionFill ?? "#141820";
+      this.feedback.onBiomeTransition();
+    }
+
+    if (currentWorld?.id) {
+      this.cachedRenderWorldId = currentWorld.id;
+      this.cachedRenderWorld = currentWorld;
+    }
+  }
+
+  drawBiomeTransitionTint() {
+    if (this.biomeTransition.time <= 0) {
       return;
     }
 
-    const paletteId = currentWorld?.tilePalette ?? "castleCourtyard";
-    this.worldMap.setTilePalette(paletteId);
-
-    if (currentWorld?.id) {
-      this.worldMap.activeWorldId = currentWorld.id;
-    }
-
-    if (currentWorld?.decorationTypes?.length > 0) {
-      this.worldMap.activeDecorationTypes = currentWorld.decorationTypes;
-    }
+    const progress = this.biomeTransition.time / this.biomeTransition.duration;
+    this.context.save();
+    this.context.fillStyle = this.biomeTransition.fill;
+    this.context.globalAlpha = progress * 0.38;
+    this.context.fillRect(0, 0, this.width, this.height);
+    this.context.restore();
   }
 
   render() {
@@ -412,9 +497,10 @@ export class Game {
       return;
     }
     this.renderer.setShake(this.screenShake);
-    const currentWorld = this.spawner.getWaveDirector().getCurrentWorld(this.survivalTime);
-    this.applyWorldTheme(currentWorld);
-    this.renderer.drawBackground(this.camera, this.worldMap, currentWorld);
+    this.renderer.drawBackground(this.camera, this.worldMap, this.cachedRenderWorld, {
+      bossActive: this.bossActive,
+    });
+    this.drawBiomeTransitionTint();
     this.biomeAmbience.draw(this.context, this.camera);
     this.renderer.drawWeaponEffects(this.weaponSystem, this.player, this.camera);
     this.renderer.drawProjectiles(this.projectiles, this.camera);
@@ -466,6 +552,7 @@ export class Game {
       particleCount: this.feedback.particles.particles.length,
       pickupCount: this.xpGems.length + this.coinPickups.length,
       showPauseButton: this.state === "playing",
+      showPerfStats: this.ui.showPerfStats,
     });
 
     if (this.state === "levelUp") {
@@ -508,6 +595,7 @@ export class Game {
     const keepGodMode = this.debugEnabled && this.godMode;
     const keepTimeScale = keepGodMode ? this.timeScale : 1;
     this.survivalTime = 0;
+    this.debugStartSurvivalTime = readDebugStartSurvivalTime();
     this.killCount = 0;
     this.bossDefeatedCount = 0;
     this.runEvolutions = [];
@@ -546,6 +634,11 @@ export class Game {
     this.hazardSystem = new HazardSystem();
     this.metaUpgradeSystem.applyToRun(this);
     applyCharacterToRun(this);
+    this.worldMap.applyWorld(getWorldForWave(getWaveForTime(0)));
+    this.cachedRenderWorld = getWorldForWave(getWaveForTime(0));
+    this.cachedRenderWorldId = this.cachedRenderWorld.id;
+    this.bossActive = false;
+    this.biomeTransition.time = 0;
     this.camera.follow(this.player.position);
     this.syncGodMode();
   }
@@ -583,7 +676,41 @@ export class Game {
     this.feedback.ensureAudio();
     this.pauseMenu.reset();
     this.resetRun();
+
+    if (this.debugStartSurvivalTime > 0) {
+      this.survivalTime = this.debugStartSurvivalTime;
+      this.applyWorldTheme(this.spawner.getWaveDirector().getCurrentWorld(this.survivalTime));
+    }
+
     this.state = "playing";
+  }
+
+  setSurvivalTimeForDebug(seconds) {
+    if (!this.debugEnabled) {
+      return false;
+    }
+
+    this.survivalTime = Math.max(0, seconds);
+    this.applyWorldTheme(this.spawner.getWaveDirector().getCurrentWorld(this.survivalTime));
+    this.worldMap.decorationCache?.clear?.();
+    return true;
+  }
+
+  advanceLateGameBiomeForDebug() {
+    if (!this.debugEnabled) {
+      return false;
+    }
+
+    const nextTime = getTimeForNextLateGameBiome(this.survivalTime);
+    return this.setSurvivalTimeForDebug(nextTime);
+  }
+
+  jumpToLateGameBiomeForDebug(biomeIndex) {
+    if (!this.debugEnabled) {
+      return false;
+    }
+
+    return this.setSurvivalTimeForDebug(getTimeForLateGameBiomeIndex(Number(biomeIndex)));
   }
 
   openChest(chest) {
@@ -774,7 +901,11 @@ export class Game {
   }
 
   processLevelUps() {
-    if (this.state !== "playing" || this.player.isDead) {
+    if (this.player.isDead) {
+      return;
+    }
+
+    if (this.state !== "playing" && this.state !== "levelUp") {
       return;
     }
 
@@ -787,6 +918,8 @@ export class Game {
       this.state = "levelUp";
       return;
     }
+
+    this.state = "playing";
   }
 
   chooseUpgrade(choiceIndex) {
@@ -800,6 +933,7 @@ export class Game {
     this.levelUpChoices = [];
 
     if (this.player.canLevelUp()) {
+      this.state = "playing";
       this.processLevelUps();
       return;
     }
@@ -825,6 +959,26 @@ export class Game {
     const currentFPS = 1 / deltaTime;
     this.fps = this.fps * this.frameSmoothing + currentFPS * (1 - this.frameSmoothing);
   }
+}
+
+function readDebugStartSurvivalTime() {
+  if (typeof window === "undefined" || !isDebugEnabled()) {
+    return 0;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const startTime = Number(params.get("startTime"));
+  const startMin = Number(params.get("startMin"));
+
+  if (Number.isFinite(startTime) && startTime > 0) {
+    return startTime;
+  }
+
+  if (Number.isFinite(startMin) && startMin > 0) {
+    return startMin * 60;
+  }
+
+  return 0;
 }
 
 function showRuntimeError(error) {

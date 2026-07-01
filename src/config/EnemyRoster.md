@@ -1,42 +1,44 @@
 # Enemy spawn roster
 
 This file documents which enemies are allowed in live spawns vs kept in config only.
-See also `WaveDefinitions.js` (regular waves) and `GameConfig.bosses` (boss timer).
+See `EnemyRotationDefinitions.js` (spawn type rotation) and `GameConfig.bosses` (boss timer).
 
-## ACTIVE ENEMIES
+## SPAWN ROTATION (normal enemies)
 
-These have working imported art and are allowed in `WaveDefinitions.spawnWeights`.
+Only **one enemy type** spawns at a time. The active type rotates through the full roster:
+
+- **0:00–4:00** — new enemy every **1 minute**
+- **4:00+** — new enemy every **2 minutes**
+
+Rotation order: all **64x Tiny Monsters** (static sprites) plus **7 animated imports** (directional walk sheets), interleaved. See `EnemyRotationDefinitions.js`.
+
+### Tiny Monsters (64)
+
+Imported from `Tiny Dungeon Monsters` → `src/assets/imported/enemies/tinyMonsters/*.png`  
+Run `npm run setup:enemies` after updating the download folder.
+
+### Animated imports (7)
+
+| ID | Notes |
+|----|-------|
+| `zombie` | Directional walk sheet |
+| `brainZombie` | Directional walk sheet |
+| `vikingUndead` | Directional walk sheet |
+| `skeletonUndead` | Directional walk sheet |
+| `popstarUndead` | Directional walk sheet |
+| `knightUndead` | Directional walk sheet |
+| `greenDragon` | Single sprite (flip for left) |
+
+## BOSS
 
 | ID | Role | Notes |
 |----|------|-------|
-| `slime` | Normal wave enemy | Skeleton/slime base visual (`tinyMonsters` pack). Spawns in every biome. |
-| `zombie` | Normal wave enemy | Imported directional sheet. Biome II+. |
-| `brainZombie` | Normal wave enemy | Imported directional sheet. Biome VIII+. |
-| `vikingUndead` | Normal wave enemy | Imported directional sheet. Biome IX+. |
-| `skeletonUndead` | Normal wave enemy | Imported directional sheet. Biome X+. |
-| `popstarUndead` | Normal wave enemy | Imported directional sheet. Biome XI. |
-| `knightUndead` | Normal wave enemy | Imported directional sheet. Biome XI. |
-| `greenDragon` | Normal wave enemy | Imported directional sheet. Biome III. |
-| `skeletonCaptain` | Timed boss | Enlarged slime visual (`visualType: "slime"`, ~1.8× scale). Spawned by `BossDirector` every 120s from 2:00. |
+| `skeletonCaptain` | Timed boss | Enlarged slime visual. Every 120s from 2:00. |
 
-## DISABLED / DO NOT SPAWN YET
+## LEGACY / DO NOT SPAWN
 
-These types may remain in `GameConfig.enemies` for future use. Do **not** add them to `WaveDefinitions.spawnWeights` or `GameConfig.bosses.activeType` — they use old/ugly procedural art that was retired.
+Old procedural types remain in `GameConfig.enemies` for future use only:
 
-- `bat`
-- `brute`
-- `crawler`
-- `elite`
-- `boss` (legacy Archivore)
-- `polarDogBoss`
-- `spottedDogBoss`
-- `reaperBoss`
-- `wolfPouncer`
-- `skeletonArcher`
-- `shieldBrute`
-- `goblinRunner`
-- `necromancer`
-- `fireImp`
-- `iceWraith`
-- `castleKnight`
-- Any other old or non-matching enemy type not listed under ACTIVE ENEMIES above.
+- `slime`, `bat`, `brute`, `crawler`, `elite`, `boss` (legacy packs)
+- `polarDogBoss`, `spottedDogBoss`, `reaperBoss`
+- `wolfPouncer`, `skeletonArcher`, `shieldBrute`, `goblinRunner`, `necromancer`, `fireImp`, `iceWraith`, `castleKnight`

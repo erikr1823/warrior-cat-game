@@ -1,4 +1,5 @@
 import { distanceBetween, directionBetween } from "../core/MathUtils.js";
+import { wrappedDirectionBetween, wrappedDistanceBetween } from "../core/WorldWrap.js";
 import { GameConfig } from "../config/GameConfig.js";
 
 export class CoinPickup {
@@ -14,14 +15,18 @@ export class CoinPickup {
 
   update(deltaTime, player, game) {
     this.bobPhase += deltaTime * 4.2;
-    const distance = distanceBetween(this.position, player.position);
+    const distance = GameConfig.world.wrapWorld
+      ? wrappedDistanceBetween(this.position, player.position)
+      : distanceBetween(this.position, player.position);
 
     if (distance <= player.magnetRadius) {
       this.isMagnetized = true;
     }
 
     if (this.isMagnetized) {
-      const direction = directionBetween(this.position, player.position);
+      const direction = GameConfig.world.wrapWorld
+        ? wrappedDirectionBetween(this.position, player.position)
+        : directionBetween(this.position, player.position);
       this.velocity.x = direction.x * GameConfig.coins.magnetSpeed;
       this.velocity.y = direction.y * GameConfig.coins.magnetSpeed;
       this.position.x += this.velocity.x * deltaTime;

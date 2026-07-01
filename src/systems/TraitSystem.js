@@ -2,6 +2,7 @@ import { GameConfig } from "../config/GameConfig.js";
 import { getTraitDefinition, getAllTraitIds } from "../config/TraitDefinitions.js";
 import { damageEnemy } from "./EnemyDamage.js";
 import { distanceBetween } from "../core/MathUtils.js";
+import { wrappedDistanceBetween } from "../core/WorldWrap.js";
 
 // Owns the set of Run Traits the player has taken this run and applies their
 // effects. Static effects run once on acquire; dynamic effects run via update()
@@ -167,7 +168,11 @@ export class TraitSystem {
         continue;
       }
 
-      if (distanceBetween(player.position, enemy.position) <= radius + enemy.radius) {
+      const dist = GameConfig.world.wrapWorld
+        ? wrappedDistanceBetween(player.position, enemy.position)
+        : distanceBetween(player.position, enemy.position);
+
+      if (dist <= radius + enemy.radius) {
         damageEnemy(game, enemy, damage, { x: 0, y: -1 });
       }
     }

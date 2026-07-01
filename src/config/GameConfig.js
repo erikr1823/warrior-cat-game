@@ -7,6 +7,7 @@ export const GameConfig = {
     tileSize: 128,
     chunkSize: 512,
     useEverRogueTileset: false,
+    wrapWorld: true,
     bounds: {
       minX: -9600,
       maxX: 9600,

@@ -1,4 +1,5 @@
 import { distanceBetween, directionBetween } from "../core/MathUtils.js";
+import { wrappedDirectionBetween, wrappedDistanceBetween } from "../core/WorldWrap.js";
 import { GameConfig } from "../config/GameConfig.js";
 
 export class XPGem {
@@ -18,14 +19,18 @@ export class XPGem {
 
   update(deltaTime, player, game) {
     this.animTime += deltaTime * 5;
-    const distance = distanceBetween(this.position, player.position);
+    const distance = GameConfig.world.wrapWorld
+      ? wrappedDistanceBetween(this.position, player.position)
+      : distanceBetween(this.position, player.position);
 
     if (distance <= player.magnetRadius) {
       this.isMagnetized = true;
     }
 
     if (this.isMagnetized) {
-      const direction = directionBetween(this.position, player.position);
+      const direction = GameConfig.world.wrapWorld
+        ? wrappedDirectionBetween(this.position, player.position)
+        : directionBetween(this.position, player.position);
       this.velocity.x = direction.x * GameConfig.xpGems.magnetSpeed;
       this.velocity.y = direction.y * GameConfig.xpGems.magnetSpeed;
       this.position.x += this.velocity.x * deltaTime;

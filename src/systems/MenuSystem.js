@@ -1,5 +1,7 @@
 import { GameConfig } from "../config/GameConfig.js";
+import { GameIdentity } from "../config/GameIdentity.js";
 import { formatTime } from "../core/MathUtils.js";
+import { UITheme, drawButton as drawThemeButton, drawPanel, drawTextShadow } from "../config/UITheme.js";
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -235,23 +237,25 @@ export class MenuSystem {
     };
     const backHovered = input.isMouseOver(this.backButton);
 
-    ctx.fillStyle = "rgba(5, 8, 13, 0.62)";
+    ctx.fillStyle = UITheme.colors.overlay;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    ctx.fillStyle = "rgba(15, 18, 24, 0.97)";
-    ctx.fillRect(panel.x, panel.y, panel.width, panel.height);
-    ctx.strokeStyle = "#ffd27e";
-    ctx.lineWidth = 5;
-    ctx.strokeRect(panel.x, panel.y, panel.width, panel.height);
+    drawPanel(ctx, panel.x, panel.y, panel.width, panel.height, {
+      fillStyle: UITheme.colors.panelBg,
+      borderColor: UITheme.colors.border,
+      borderWidth: 3,
+    });
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 56px 'Courier New', monospace";
-    ctx.fillText("LEADERBOARD", centerX, panel.y + 28);
+    ctx.font = UITheme.fonts.titleSmall;
+    drawTextShadow(ctx, "LEADERBOARD", centerX, panel.y + 28, {
+      fillStyle: UITheme.colors.textPrimary,
+      align: "center",
+    });
 
-    ctx.font = "600 20px 'Courier New', monospace";
-    ctx.fillStyle = "#9eb0aa";
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textMuted;
     ctx.fillText("Top 10 — longest survival", centerX, panel.y + 96);
 
     ctx.strokeStyle = "rgba(255, 210, 126, 0.35)";
@@ -266,17 +270,19 @@ export class MenuSystem {
 
     if (this.leaderboardLoading) {
       ctx.textAlign = "center";
-      ctx.font = "600 26px 'Courier New', monospace";
-      ctx.fillStyle = "#9eb0aa";
+      ctx.font = UITheme.fonts.body;
+      ctx.fillStyle = UITheme.colors.textMuted;
       ctx.fillText("Loading...", centerX, rowY + 20);
     } else if (this.leaderboardStatus) {
       ctx.textAlign = "center";
-      ctx.font = "600 24px 'Courier New', monospace";
-      ctx.fillStyle = this.leaderboardStatus.startsWith("Could not") ? "#ff8a72" : "#9eb0aa";
+      ctx.font = UITheme.fonts.body;
+      ctx.fillStyle = this.leaderboardStatus.startsWith("Could not")
+        ? UITheme.colors.warning
+        : UITheme.colors.textMuted;
       ctx.fillText(this.leaderboardStatus, centerX, rowY + 20);
     } else {
       ctx.textAlign = "left";
-      ctx.font = "700 22px 'Courier New', monospace";
+      ctx.font = UITheme.fonts.body;
 
       this.leaderboardEntries.slice(0, 10).forEach((entry, index) => {
         const rank = `${index + 1}.`.padEnd(4, " ");
@@ -286,7 +292,7 @@ export class MenuSystem {
           .padEnd(12, " ");
         const time = formatTime(entry.survival_time ?? 0).padStart(5, " ");
         const line = `${rank}${name}  ${time}   ${entry.kills ?? 0} kills   Lv ${entry.final_level ?? 1}`;
-        ctx.fillStyle = index === 0 ? "#ffe09a" : "#d9e8e2";
+        ctx.fillStyle = index === 0 ? UITheme.colors.accent : UITheme.colors.textSecondary;
         ctx.fillText(line, leftX, rowY);
         rowY += 44;
       });
@@ -296,8 +302,8 @@ export class MenuSystem {
     this.drawSecondaryButton(this.backButton, backHovered);
 
     ctx.textAlign = "center";
-    ctx.font = "700 20px 'Courier New', monospace";
-    ctx.fillStyle = "#7a8a86";
+    ctx.font = UITheme.fonts.bodySmall;
+    ctx.fillStyle = UITheme.colors.textDim;
     ctx.fillText("ESC / ENTER / CLICK BACK", centerX, panel.y + panel.height - 32);
   }
 
@@ -333,24 +339,26 @@ export class MenuSystem {
       },
     ];
 
-    ctx.fillStyle = "rgba(5, 8, 13, 0.62)";
+    ctx.fillStyle = UITheme.colors.overlay;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    ctx.fillStyle = "rgba(15, 18, 24, 0.97)";
-    ctx.fillRect(panel.x, panel.y, panel.width, panel.height);
-    ctx.strokeStyle = "#ffd27e";
-    ctx.lineWidth = 5;
-    ctx.strokeRect(panel.x, panel.y, panel.width, panel.height);
+    drawPanel(ctx, panel.x, panel.y, panel.width, panel.height, {
+      fillStyle: UITheme.colors.panelBg,
+      borderColor: UITheme.colors.border,
+      borderWidth: 3,
+    });
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#fff4dc";
-    ctx.font = "900 56px 'Courier New', monospace";
-    ctx.fillText("CREDITS", centerX, panel.y + 32);
+    ctx.font = UITheme.fonts.titleSmall;
+    drawTextShadow(ctx, "CREDITS", centerX, panel.y + 32, {
+      fillStyle: UITheme.colors.textPrimary,
+      align: "center",
+    });
 
-    ctx.font = "600 22px 'Courier New', monospace";
-    ctx.fillStyle = "#9eb0aa";
-    ctx.fillText("Warrior Cat Game Test", centerX, panel.y + 102);
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textMuted;
+    ctx.fillText(GameIdentity.title, centerX, panel.y + 102);
 
     ctx.strokeStyle = "rgba(255, 210, 126, 0.35)";
     ctx.lineWidth = 2;
@@ -364,31 +372,31 @@ export class MenuSystem {
 
     for (const column of columns) {
       if (column.role) {
-        ctx.font = "700 18px 'Courier New', monospace";
-        ctx.fillStyle = "#9eb0aa";
+        ctx.font = UITheme.fonts.label;
+        ctx.fillStyle = UITheme.colors.textMuted;
         ctx.fillText(column.role, column.x, panel.y + 156);
       }
 
       this.drawCreditPhoto(column.photo, column.x, photoTop, photoBox.width, photoBox.height);
 
-      ctx.font = column.role ? "700 26px 'Courier New', monospace" : "600 26px 'Courier New', monospace";
-      ctx.fillStyle = column.role ? "#ffe09a" : "#d9e8e2";
+      ctx.font = column.role ? UITheme.fonts.subheading : UITheme.fonts.body;
+      ctx.fillStyle = column.role ? UITheme.colors.accent : UITheme.colors.textSecondary;
       ctx.fillText(column.name, column.x, nameTop);
     }
 
-    ctx.font = "600 22px 'Courier New', monospace";
-    ctx.fillStyle = "#9eb0aa";
+    ctx.font = UITheme.fonts.body;
+    ctx.fillStyle = UITheme.colors.textMuted;
     ctx.fillText("Thank you for playing.", centerX, panel.y + 392);
 
-    ctx.font = "600 18px 'Courier New', monospace";
-    ctx.fillStyle = "#7a8a86";
+    ctx.font = UITheme.fonts.bodySmall;
+    ctx.fillStyle = UITheme.colors.textDim;
     ctx.fillText("Music: King's Feast by RandomMind (CC0)", centerX, panel.y + 430);
 
     this.backButton.y = panel.y + 468;
     this.drawSecondaryButton(this.backButton, backHovered);
 
-    ctx.font = "700 20px 'Courier New', monospace";
-    ctx.fillStyle = "#7a8a86";
+    ctx.font = UITheme.fonts.bodySmall;
+    ctx.fillStyle = UITheme.colors.textDim;
     ctx.fillText("ESC / ENTER / CLICK BACK", centerX, panel.y + panel.height - 36);
   }
 
@@ -400,11 +408,12 @@ export class MenuSystem {
     const frameWidth = maxWidth + pad * 2;
     const frameHeight = maxHeight + pad * 2;
 
-    ctx.fillStyle = "#0b0e14";
-    ctx.fillRect(frameX, frameY, frameWidth, frameHeight);
-    ctx.strokeStyle = "#ffd27e";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(frameX, frameY, frameWidth, frameHeight);
+    drawPanel(ctx, frameX, frameY, frameWidth, frameHeight, {
+      fillStyle: UITheme.colors.buttonShadow,
+      borderColor: UITheme.colors.border,
+      borderWidth: 2,
+      cornerAccent: false,
+    });
 
     if (!photo?.complete || photo.naturalWidth <= 0) {
       return;
@@ -420,22 +429,10 @@ export class MenuSystem {
   }
 
   drawSecondaryButton(button, isHovered) {
-    const ctx = this.context;
-
-    ctx.fillStyle = "#0b0e14";
-    ctx.fillRect(button.x + 6, button.y + 6, button.width, button.height);
-
-    ctx.fillStyle = isHovered ? "#ffe09a" : "#4a7058";
-    ctx.fillRect(button.x, button.y, button.width, button.height);
-
-    ctx.fillStyle = "#2a1e28";
-    ctx.fillRect(button.x + 8, button.y + 8, button.width - 16, button.height - 16);
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "900 28px 'Courier New', monospace";
-    ctx.fillStyle = isHovered ? "#fff6d4" : "#ffe09a";
-    ctx.fillText(button.label, button.x + button.width / 2, button.y + button.height / 2);
+    drawThemeButton(this.context, button, {
+      hovered: isHovered,
+      fontStyle: UITheme.fonts.button,
+    });
   }
 
   drawMenuBackground() {
@@ -502,31 +499,10 @@ export class MenuSystem {
   }
 
   drawButton(button, isHovered) {
-    const ctx = this.context;
-    const inset = isHovered ? 0 : 8;
-
-    ctx.fillStyle = "#0b0e14";
-    ctx.fillRect(button.x + 14, button.y + 14, button.width, button.height);
-
-    ctx.fillStyle = isHovered ? "#ffe09a" : "#b94f42";
-    ctx.fillRect(button.x, button.y, button.width, button.height);
-
-    ctx.fillStyle = isHovered ? "#55323a" : "#2a1e28";
-    ctx.fillRect(button.x + 10, button.y + 10, button.width - 20, button.height - 20);
-
-    ctx.fillStyle = isHovered ? "#fff6d4" : "#ffe09a";
-    ctx.fillRect(button.x + inset, button.y + inset, button.width - inset * 2, 8);
-    ctx.fillRect(button.x + inset, button.y + button.height - inset - 8, button.width - inset * 2, 8);
-    ctx.fillRect(button.x + inset, button.y + inset, 8, button.height - inset * 2);
-    ctx.fillRect(button.x + button.width - inset - 8, button.y + inset, 8, button.height - inset * 2);
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "900 42px 'Courier New', monospace";
-    ctx.fillStyle = "#080a0f";
-    ctx.fillText(button.label, button.x + button.width / 2 + 4, button.y + button.height / 2 + 5);
-    ctx.fillStyle = isHovered ? "#fff6d4" : "#ffe09a";
-    ctx.fillText(button.label, button.x + button.width / 2, button.y + button.height / 2);
+    drawThemeButton(this.context, button, {
+      hovered: isHovered,
+      fontStyle: UITheme.fonts.buttonLarge,
+    });
   }
 
   drawHint() {
@@ -534,10 +510,11 @@ export class MenuSystem {
 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "700 30px 'Courier New', monospace";
-    ctx.fillStyle = "#080a0f";
-    ctx.fillText("WASD / ARROWS TO MOVE   -   ENTER OR CLICK TO START", this.width / 2 + 3, 972 + 3);
-    ctx.fillStyle = "#fff6d4";
-    ctx.fillText("WASD / ARROWS TO MOVE   -   ENTER OR CLICK TO START", this.width / 2, 972);
+    ctx.font = UITheme.fonts.body;
+    drawTextShadow(ctx, "WASD / ARROWS TO MOVE   ·   ENTER OR CLICK TO START", this.width / 2, 972, {
+      fillStyle: UITheme.colors.accentBright,
+      align: "center",
+      baseline: "middle",
+    });
   }
 }

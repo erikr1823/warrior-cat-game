@@ -1,6 +1,26 @@
 import { GameConfig } from "./GameConfig.js";
-import { directionBetween, distanceBetween, normalizeVector } from "../core/MathUtils.js";
+import {
+  directionBetween,
+  distanceBetween,
+  normalizeVector,
+} from "../core/MathUtils.js";
+import {
+  wrappedDirectionBetween,
+  wrappedDistanceBetween,
+} from "../core/WorldWrap.js";
 import { Enemy } from "../entities/Enemy.js";
+
+function directionToPlayer(from, player) {
+  return GameConfig.world.wrapWorld
+    ? wrappedDirectionBetween(from, player.position)
+    : directionBetween(from, player.position);
+}
+
+function distanceToPlayer(from, player) {
+  return GameConfig.world.wrapWorld
+    ? wrappedDistanceBetween(from, player.position)
+    : distanceBetween(from, player.position);
+}
 
 // Elite behavior modifiers layered on top of normal enemies (no new sprites).
 // They appear gradually as the run goes on and are visually marked by a colored
@@ -95,7 +115,7 @@ function updateRusher(enemy, deltaTime, player) {
   if (state.chargeTimer <= 0) {
     state.chargeTimer = 2.6;
     state.bursting = 0.45;
-    state.burstDir = directionBetween(enemy.position, player.position);
+    state.burstDir = directionToPlayer(enemy.position, player);
   }
 
   return false;
@@ -103,8 +123,8 @@ function updateRusher(enemy, deltaTime, player) {
 
 function updateCaster(enemy, deltaTime, player, game) {
   const state = enemy.modifierState;
-  const toPlayer = directionBetween(enemy.position, player.position);
-  const dist = distanceBetween(enemy.position, player.position);
+  const toPlayer = directionToPlayer(enemy.position, player);
+  const dist = distanceToPlayer(enemy.position, player);
   const desired = 320;
   let moveDir = { x: 0, y: 0 };
 

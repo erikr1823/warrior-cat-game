@@ -1,5 +1,7 @@
 import { clamp } from "../core/MathUtils.js";
 import { GameConfig } from "../config/GameConfig.js";
+import { getWorldDefinition } from "../config/WorldDefinitions.js";
+import { UITheme, drawPanel, drawProgressBar, drawTextOutline, drawTextShadow } from "../config/UITheme.js";
 import { getEffectSprite, getPickupSprite, getProjectileSprite } from "../assets/SpriteCache.js";
 
 const SOURCE_SIZE = GameConfig.sprites.sourceSize;
@@ -35,12 +37,19 @@ export class Renderer {
     this.context.restore();
   }
 
-  drawBackground(camera, worldMap, world = null) {
+  drawBackground(camera, worldMap, world = null, options = {}) {
     const ctx = this.context;
 
     worldMap.draw(ctx, camera);
     this.drawBiomeAtmosphere(ctx, world);
     this.drawAmbientVignette(ctx, world);
+
+    if (options.bossActive && world?.bossArenaMood) {
+      ctx.save();
+      ctx.fillStyle = world.bossArenaMood;
+      ctx.fillRect(0, 0, this.width, this.height);
+      ctx.restore();
+    }
   }
 
   drawBiomeAtmosphere(ctx, world) {
@@ -192,6 +201,8 @@ export class Renderer {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
 
+    let cachedBossMood = null;
+
     for (const enemy of enemies) {
       screen.x = enemy.position.x - camera.position.x;
       screen.y = enemy.position.y - camera.position.y;
@@ -246,6 +257,22 @@ export class Renderer {
         ctx.arc(screen.x, screen.y, enemy.collisionRadius + 8, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
+      }
+
+      if (enemy.isBoss) {
+        if (cachedBossMood === null) {
+          cachedBossMood = getWorldDefinition(enemy.worldId)?.bossArenaMood ?? false;
+        }
+
+        if (cachedBossMood) {
+          ctx.save();
+          ctx.strokeStyle = cachedBossMood;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(screen.x, screen.y, enemy.collisionRadius + 14, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
 
       if (enemy.hitFlashTime > 0) {
@@ -484,7 +511,7 @@ export class Renderer {
     ctx.save();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "900 24px 'Courier New', monospace";
+    ctx.font = UITheme.fonts.subheading;
 
     for (const damageNumber of damageNumbers) {
       const screenPosition = camera.worldToScreen(damageNumber.position);
@@ -576,28 +603,28 @@ export class Renderer {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
 
-    ctx.fillStyle = "rgba(8, 9, 12, 0.82)";
-    ctx.fillRect(x - 8, y - 34, barWidth + 16, barHeight + 48);
-    ctx.strokeStyle = "rgba(255, 90, 72, 0.65)";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(x - 8, y - 34, barWidth + 16, barHeight + 48);
+    drawPanel(ctx, x - 8, y - 34, barWidth + 16, barHeight + 48, {
+      fillStyle: UITheme.colors.panelBg,
+      borderColor: "rgba(255, 90, 72, 0.65)",
+      borderWidth: 2,
+    });
 
-    ctx.font = "900 28px 'Courier New', monospace";
-    ctx.fillStyle = "#180810";
-    ctx.fillText(bossName.toUpperCase(), screenWidth / 2 + 2, y - 30);
-    ctx.fillStyle = "#ff8a72";
-    ctx.fillText(bossName.toUpperCase(), screenWidth / 2, y - 32);
+    ctx.font = UITheme.fonts.heading;
+    drawTextOutline(ctx, bossName.toUpperCase(), screenWidth / 2, y - 32, {
+      fillStyle: "#ff8a72",
+      strokeStyle: UITheme.colors.shadow,
+      lineWidth: 2,
+      align: "center",
+    });
 
-    ctx.fillStyle = "#3a1018";
-    ctx.fillRect(x, y, barWidth, barHeight);
-    ctx.fillStyle = "#ff4a3a";
-    ctx.fillRect(x, y, barWidth * percent, barHeight);
-    ctx.fillStyle = "rgba(255, 244, 220, 0.35)";
-    ctx.fillRect(x, y, barWidth * percent, 8);
+    drawProgressBar(ctx, x, y, barWidth, barHeight, percent, {
+      trackColor: "#3a1018",
+      fillColor: "#ff4a3a",
+      label: `${Math.ceil(boss.health)} / ${boss.maxHealth}`,
+      labelColor: UITheme.colors.textPrimary,
+      fontStyle: UITheme.fonts.label,
+    });
 
-    ctx.font = "800 18px 'Courier New', monospace";
-    ctx.fillStyle = "#fff4dc";
-    ctx.fillText(`${Math.ceil(boss.health)} / ${boss.maxHealth}`, screenWidth / 2, y + 2);
     ctx.restore();
   }
 
